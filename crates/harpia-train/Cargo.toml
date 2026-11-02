@@ -1,8 +1,8 @@
 [package]
 name = "harpia-train"
-description = "Fine-tuning in pure Rust: LoRA SFT, preference optimization, encoder and embedding training."
-keywords = ["llm", "nlp", "machine-learning", "ai", "dataset"]
-categories = ["science", "text-processing"]
+description = "Fine-tuning in pure Rust on candle: encoder classifiers and cross-encoders, LoRA SFT and DPO for decoders, with PEFT-compatible export."
+keywords = ["llm", "fine-tuning", "lora", "candle", "training"]
+categories = ["science"]
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -14,6 +14,18 @@ readme = "README.md"
 
 [dependencies]
 harpia-core = { workspace = true }
+harpia-data = { workspace = true, features = ["tokenizers"] }
+harpia-local = { workspace = true }
+candle-core = { workspace = true }
+candle-nn = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tokenizers = { workspace = true }
+tracing = { workspace = true }
+rayon = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
 
 [lints]
 workspace = true

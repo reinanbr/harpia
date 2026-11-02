@@ -28,7 +28,7 @@ Status legend: **done** (in 0.1), **planned (Mn)** (milestone n), **gap** (not y
 | `citecheck.py` thresholds file | calibrated per-label thresholds | `harpia-eval` calibration | planned (M5) |
 | `treino/traduzir.py` | MarianMT batched translation, resumable cache | `harpia_local::MarianTranslator` + `JsonlCache`; `harpia translate --cache` | experimental: needs a `tokenizer.json` export of the SentencePiece tokenizer; not yet verified on opus-mt-tc-big-en-pt |
 | `treino/preparar.py`, `comum.py` | JSONL IO, seeded splits | `harpia_data::{read_jsonl, JsonlWriter}`, `split::{random_split, group_split}`, `rng::SplitMix64` | done |
-| `treino/treinar.py` | cross-encoder fine-tuning: AdamW, warmup/linear decay, clipping, class weights, macro-F1 per epoch, best checkpoint | `harpia-train`; class weights: `harpia_data::split::class_weights` | weights done; training planned (M4) |
+| `treino/treinar.py` | cross-encoder fine-tuning: AdamW, warmup/linear decay, clipping, class weights, macro-F1 per epoch, best checkpoint | `harpia_train::train_classifier`, `harpia train classifier --label-map ...`; verified on the real MiniLM base (checkpoint reloads in transformers to 1e-6) | done (no dropout) |
 | `treino/avaliar.py`, `finalizar.py` | per-class P/R/F1, macro F1, threshold grid search on val, frozen test, baseline, model card | `harpia-eval` | planned (M5) |
 | `tests/test_acceptance.py` "no network unless `--online`" | offline guarantee | `NetworkPolicy::Offline` default, enforced in `harpia-http`; `harpia_http::testing::ConnectionCounter` | done |
 | `tests/test_performance.py` 20 files < 5 s | text throughput | `harpia-text` benches: segmentation + signals + Flesch + MATTR + shingles on 128 KB take ≈ 7 ms on an i5-12450H (see `benchmarks.md`) | done |

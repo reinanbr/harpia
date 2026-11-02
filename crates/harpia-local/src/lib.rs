@@ -16,6 +16,7 @@
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
 
+pub mod adapter;
 mod cache;
 pub mod decoder;
 mod encoder;
@@ -26,7 +27,7 @@ pub mod testing;
 
 pub use cache::ModelCache;
 pub use candle_core::{DType, Device};
-pub use decoder::TextGenerator;
+pub use decoder::{CausalLm, TextGenerator};
 pub use encoder::{EncoderEmbedder, Pooling, SequenceClassifier, softmax};
 pub use loader::ModelDir;
 pub use marian::{MarianTranslator, Search};

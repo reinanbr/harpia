@@ -46,3 +46,19 @@ Measured on the same machine (i5-12450H) on the 50 parity pairs (`max_length` 19
 | PyTorch 2.15.0+cpu / transformers 5.22.1 | 3.1 s | 20.9 pairs/s |
 
 Harpia loads faster and runs about 10% slower on this workload; the logits agree to 1e-5.
+
+## Classifier fine-tuning (multilingual-MiniLMv2-L6-mnli-xnli, 117 M parameters, f32, CPU)
+
+One epoch over 320 errei/SciFact training pairs (20 steps of 16, `max_length` 192), validation on
+200 pairs, same machine, dropout off in both, errei's hyperparameters.
+
+| | wall time | peak RSS | val macro-F1 after 1 epoch |
+|---|---:|---:|---:|
+| Harpia (`harpia train classifier`, release) | 152 s total (load, train, eval, save) | 8.4 GB | 0.488 |
+| PyTorch 2.15.0+cpu (training loop only) | 88 s | 3.6 GB | 0.458 |
+
+The base model scores 0.519 on this validation slice before training; one epoch on 320 pairs is
+a smoke test, not a quality claim. Harpia is roughly 1.7× slower and uses 2.3× the memory: the
+backward pass of candle's CPU autodiff dominates (≈4 s of ≈6 s per step); the fused AdamW brought
+the optimizer step from 3.3 s to 0.7 s. The saved checkpoint loads in transformers and gives the
+same probabilities to 6 decimals.

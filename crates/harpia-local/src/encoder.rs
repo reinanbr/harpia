@@ -146,6 +146,21 @@ impl SequenceClassifier {
         let labels = md.labels(num_labels);
         let vb = md.var_builder(dtype, device)?;
         let tok = md.tokenizer()?;
+        Self::from_parts(&md, vb, &tok, device, max_len, labels)
+    }
+
+    /// Build from an explicit `VarBuilder` (e.g. trainable variables in `harpia-train`), with
+    /// the architecture read from `md` and one output per entry of `labels`.
+    pub fn from_parts(
+        md: &ModelDir,
+        vb: VarBuilder,
+        tok: &HfTokenizer,
+        device: &Device,
+        max_len: usize,
+        labels: Vec<String>,
+    ) -> Result<Self> {
+        let dir = md.root.as_path();
+        let num_labels = labels.len();
         let (arch, head, pad_id) = if is_roberta(md.model_type()) {
             let cfg: xlm_roberta::Config = md.config_as()?;
             let pad = cfg.pad_token_id;
@@ -169,7 +184,7 @@ impl SequenceClassifier {
         Ok(Self {
             core: EncoderCore {
                 arch,
-                tokenizer: EncoderCore::tokenizer_with_truncation(&tok, max_len)?,
+                tokenizer: EncoderCore::tokenizer_with_truncation(tok, max_len)?,
                 pad_id,
                 device: device.clone(),
                 dir: dir.to_path_buf(),
@@ -218,10 +233,21 @@ impl SequenceClassifier {
         }
     }
 
+    /// Token ids for one input (pair when `second` is given), with truncation.
+    pub fn encode_input(&self, first: &str, second: Option<&str>) -> Result<Vec<u32>> {
+        self.core.encode(first, second)
+    }
+
+    /// Logits `(batch, labels)` for already-encoded inputs, padded internally. The result keeps
+    /// the autograd graph, so it can be used as a training loss input.
+    pub fn batch_logits(&self, batch: &[Vec<u32>]) -> Result<Tensor> {
+        let (hidden, _) = self.core.forward(batch)?;
+        self.head_logits(&hidden)
+    }
+
     fn logits_for(&self, inputs: Vec<Vec<u32>>) -> Result<Vec<Vec<f32>>> {
         self.core.batched(inputs, |batch| {
-            let (hidden, _) = self.core.forward(batch)?;
-            let logits = self.head_logits(&hidden)?;
+            let logits = self.batch_logits(batch)?;
             logits.to_dtype(DType::F32).and_then(|t| t.to_vec2::<f32>()).map_err(ce(&self.core.dir))
         })
     }

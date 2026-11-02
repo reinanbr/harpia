@@ -1419,6 +1419,7 @@ dependencies = [
  "harpia-local",
  "harpia-structured",
  "harpia-text",
+ "harpia-train",
  "serde",
  "serde_json",
  "tokio",
@@ -1575,7 +1576,17 @@ dependencies = [
 name = "harpia-train"
 version = "0.1.0"
 dependencies = [
+ "candle-core",
+ "candle-nn",
  "harpia-core",
+ "harpia-data",
+ "harpia-local",
+ "rayon",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "tokenizers",
+ "tracing",
 ]
 
 [[package]]

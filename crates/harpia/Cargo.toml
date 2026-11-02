@@ -38,8 +38,10 @@ local = ["data", "structured", "tokenizers", "dep:harpia-local"]
 cuda = ["local", "harpia-local?/cuda"]
 ## Apple GPU inference (native code: Metal).
 metal = ["local", "harpia-local?/metal"]
+## Fine-tuning (classifiers, LoRA SFT, DPO). Pure Rust on CPU.
+train = ["local", "dep:harpia-train"]
 ## Everything implemented so far, in pure Rust (add `tls` for HTTPS).
-full = ["text", "data", "structured", "langid", "tokenizers", "schema", "http", "client", "local"]
+full = ["text", "data", "structured", "langid", "tokenizers", "schema", "http", "client", "local", "train"]
 
 [dependencies]
 harpia-core = { workspace = true }
@@ -49,6 +51,7 @@ harpia-structured = { workspace = true, optional = true }
 harpia-http = { workspace = true, optional = true }
 harpia-client = { workspace = true, optional = true }
 harpia-local = { workspace = true, optional = true }
+harpia-train = { workspace = true, optional = true }
 
 [dev-dependencies]
 serde = { workspace = true }

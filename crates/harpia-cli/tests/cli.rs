@@ -226,3 +226,63 @@ fn local_classify_generate_embed_and_chat() {
         .assert()
         .success();
 }
+
+#[test]
+fn train_classifier_and_lora_sft_end_to_end() {
+    use harpia::local::testing;
+    let dir = tempfile::tempdir().unwrap();
+    let base = dir.path().join("base");
+    testing::xlm_roberta_classifier(&base, &["entailment", "neutral", "contradiction"]).unwrap();
+    let data = dir.path().join("pairs.jsonl");
+    let rows: String = (0..12)
+        .map(|i| {
+            let (h, l) = [("yes", "supports"), ("no", "contradicts"), ("bird", "neutral")][i % 3];
+            format!("{{\"premise\": \"the harpy eagle eats sloths\", \"hypothesis\": \"{h}\", \"label\": \"{l}\"}}\n")
+        })
+        .collect();
+    fs::write(&data, rows).unwrap();
+    let out = dir.path().join("nli");
+    harpia()
+        .args(["train", "classifier", "--base"])
+        .arg(&base)
+        .arg("--train")
+        .arg(&data)
+        .arg("--val")
+        .arg(&data)
+        .arg("--out")
+        .arg(&out)
+        .args(["--hypothesis", "hypothesis", "--labels", "supports,neutral,contradicts"])
+        .args([
+            "--label-map",
+            "supports=entailment,contradicts=contradiction",
+            "--epochs",
+            "2",
+            "--lr",
+            "0.001",
+            "--batch-size",
+            "4",
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("best val macro-F1"));
+    let cfg: serde_json::Value = serde_json::from_str(&fs::read_to_string(out.join("config.json")).unwrap()).unwrap();
+    assert_eq!(cfg["id2label"]["2"], "contradicts");
+
+    let lm = dir.path().join("lm");
+    testing::qwen2(&lm).unwrap();
+    let chat = dir.path().join("chat.jsonl");
+    fs::write(&chat, "{\"messages\": [{\"role\": \"user\", \"content\": \"hello\"}, {\"role\": \"assistant\", \"content\": \"hello world\"}]}\n").unwrap();
+    let adapter = dir.path().join("adapter");
+    harpia()
+        .args(["train", "sft", "--base"])
+        .arg(&lm)
+        .arg("--data")
+        .arg(&chat)
+        .arg("--out")
+        .arg(&adapter)
+        .args(["--r", "4", "--epochs", "3", "--lr", "0.01"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("3 steps"));
+    assert!(adapter.join("adapter_config.json").exists());
+}

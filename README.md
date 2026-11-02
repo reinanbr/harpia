@@ -42,7 +42,7 @@ Harpia covers the full lifecycle of **data and large language models**:
 | `harpia` | umbrella crate re-exporting the above | **stable** |
 | `harpia-cli` | the `harpia` binary | **stable** (text, data and LLM commands) |
 | `harpia-local` | candle inference: sequence/pair classifiers and rerankers (BERT, RoBERTa, XLM-R; parity with transformers 1e-5), embeddings, Qwen2/Llama generation with constrained decoding and log-probs, MarianMT (experimental) | **stable** |
-| `harpia-train` | LoRA SFT, DPO, encoder and embedding fine-tuning | planned (milestone 4) |
+| `harpia-train` | classifier / cross-encoder fine-tuning (verified on a real XLM-R model; checkpoints load in transformers), LoRA SFT with PEFT export, DPO (experimental) | **stable** |
 | `harpia-eval` | eval harness, judges, RAG metrics, calibration, model cards | planned (milestone 5) |
 | `harpia-verify` | grounding against trusted sources | planned (milestone 6) |
 
@@ -111,6 +111,8 @@ harpia chat --provider openai --base-url http://localhost:8000/v1 --model qwen2.
 harpia classify --model models/nli pairs.jsonl --premise evidence --hypothesis claim --thresholds t.json -o scored.jsonl
 harpia generate --model models/qwen2.5-0.5b-instruct --chat --schema answer.json "Is the sky blue?"
 harpia chat --provider local --model models/qwen2.5-0.5b-instruct "Olá!"
+harpia train classifier --base models/mnli --train pairs.jsonl --val val.jsonl --out models/my-nli --hypothesis claim
+harpia train sft --base models/qwen2.5-0.5b-instruct --data chat.jsonl --out adapters/sft --merge
 harpia data synth topics.jsonl --provider anthropic --model claude-opus-5-5 --template qa.toml --online -o qa.jsonl
 ```
 
@@ -135,6 +137,7 @@ environment error.
 | `http` | no | `harpia::http` (polite HTTP, `http://` only without `tls`) | no |
 | `client` | no | `harpia::client` (OpenAI-compatible, Anthropic, Ollama, batch runner, synthesis) | no |
 | `local` | no | `harpia::local` (candle, CPU) | no |
+| `train` | no | `harpia::train` (fine-tuning) | no |
 | `full` | no | all of the above | no |
 | `cuda` | no | NVIDIA GPU inference | **yes** (CUDA toolkit) |
 | `metal` | no | Apple GPU inference | **yes** (Metal) |
@@ -159,7 +162,8 @@ See [`docs/models.md`](docs/models.md) for supported architectures, verification
 | `transformers` sequence classification, cross-encoders, `sentence-transformers` embeddings | `harpia-local` | available (XLM-R verified against transformers) |
 | `transformers` text generation + `outlines` constrained decoding | `harpia-local::TextGenerator` | available for Qwen2/Llama (not yet verified on a real checkpoint) |
 | `transformers` MarianMT | `harpia-local::MarianTranslator` | experimental |
-| `peft` / `trl` training | `harpia-train` | planned |
+| `transformers` Trainer for sequence classification | `harpia-train::train_classifier` | available (about 1.7× slower than PyTorch on CPU, see benchmarks) |
+| `peft` LoRA SFT, `trl` DPO | `harpia-train::{train_lora_sft, train_lora_dpo}` | available (DPO experimental) |
 | `lm-eval-harness` / `ragas` | `harpia-eval` | planned |
 | `httpx` + sqlite cache, `tenacity` retries | `harpia-http` | available |
 | `openai`, `anthropic`, `ollama` clients (chat, streaming, tools, embeddings) | `harpia-client` | available |
@@ -190,8 +194,8 @@ reference checking) are mapped to Harpia APIs in `docs/errei-mapping.md`.
 3. **local**: done: encoders (classifiers, rerankers, embeddings), Qwen2/Llama decoders with chat
    templates, constrained decoding and log-probs, MarianMT (experimental). Still to come: GGUF
    quantized models, LoRA adapter loading (with train), Hub downloads.
-4. **train**: LoRA SFT with PEFT-compatible export, encoder and embedding fine-tuning, then
-   DPO/QLoRA.
+4. **train**: done: classifier fine-tuning, LoRA SFT with PEFT export, DPO (experimental). Still
+   to come: embedding fine-tuning, QLoRA, optimizer-state checkpoints.
 5. **eval**: harness, judges, RAG metrics, calibration, model cards; RAG retrieval in
    `harpia-data`.
 6. **verify**: trusted-source registry, adapters, claim and reference verification.

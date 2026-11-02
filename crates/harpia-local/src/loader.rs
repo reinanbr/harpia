@@ -65,14 +65,19 @@ impl ModelDir {
         Ok(files)
     }
 
-    /// A `VarBuilder` over all weights, read into memory (no `unsafe` memory mapping).
-    pub fn var_builder(&self, dtype: DType, device: &Device) -> Result<VarBuilder<'static>> {
+    /// All weight tensors by name, read into memory (no `unsafe` memory mapping).
+    pub fn tensors(&self, device: &Device) -> Result<std::collections::HashMap<String, candle_core::Tensor>> {
         let mut tensors = std::collections::HashMap::new();
         for f in self.weight_files()? {
             let loaded = candle_core::safetensors::load(&f, device).map_err(|e| model_err(&f, e))?;
             tensors.extend(loaded);
         }
-        Ok(VarBuilder::from_tensors(tensors, dtype, device))
+        Ok(tensors)
+    }
+
+    /// A `VarBuilder` over all weights.
+    pub fn var_builder(&self, dtype: DType, device: &Device) -> Result<VarBuilder<'static>> {
+        Ok(VarBuilder::from_tensors(self.tensors(device)?, dtype, device))
     }
 
     /// `tokenizer.json` of the model.

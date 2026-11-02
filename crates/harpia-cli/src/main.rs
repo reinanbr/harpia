@@ -6,6 +6,7 @@ mod data_cmd;
 mod llm_cmd;
 mod local_cmd;
 mod text_cmd;
+mod train_cmd;
 mod util;
 
 use clap::{Parser, Subcommand};
@@ -62,6 +63,9 @@ enum Command {
     Translate(local_cmd::TranslateArgs),
     /// Add sentence embeddings to JSONL rows with a local encoder model.
     Embed(local_cmd::EmbedArgs),
+    /// Fine-tune models (classifier, LoRA SFT, DPO).
+    #[command(subcommand)]
+    Train(train_cmd::TrainCommand),
     /// Dataset tools (inspect, convert, filter, pii, dedup, decontaminate, split, template, pack).
     #[command(subcommand)]
     Data(data_cmd::DataCommand),
@@ -82,6 +86,7 @@ fn main() -> ExitCode {
         Command::Translate(a) => local_cmd::translate(a, cli.format),
         Command::Embed(a) => local_cmd::embed(a, cli.format),
         Command::Data(c) => data_cmd::run(c, cli.format),
+        Command::Train(c) => train_cmd::run(c, cli.format),
     };
     match result {
         Ok(code) => code,

@@ -8,7 +8,7 @@
 use crate::loader::{ModelDir, model_err};
 use crate::sampling::{Sampler, apply_penalties, log_softmax};
 use candle_core::{DType, Device, Module, Tensor};
-use candle_nn::{Linear, linear_no_bias};
+use candle_nn::{Linear, VarBuilder, linear_no_bias};
 use candle_transformers::models::{llama, qwen2};
 use harpia_core::traits::{
     ChatChunk, ChatRequest, ChatResponse, ChatStream, ChatTemplate, FinishReason, Generation, GenerationParams, Model,
@@ -85,6 +85,62 @@ impl Lm {
     }
 }
 
+/// The bare causal LM (no tokenizer), for training: build it from any `VarBuilder` and get
+/// differentiable logits for every position.
+pub struct CausalLm(Lm);
+
+impl CausalLm {
+    /// Build the architecture named in `md` (`qwen2`, `llama`, `mistral`) from `vb`.
+    pub fn from_var_builder(md: &ModelDir, vb: VarBuilder, dtype: DType, device: &Device) -> Result<Self> {
+        let dir = md.root.as_path();
+        let ce = |e: candle_core::Error| model_err(dir, e);
+        let lm = match md.model_type() {
+            "qwen2" => {
+                let cfg: qwen2::Config = md.config_as()?;
+                let base = qwen2::Model::new(&cfg, vb.clone()).map_err(ce)?;
+                let lm_head = if vb.contains_tensor("lm_head.weight") {
+                    linear_no_bias(cfg.hidden_size, cfg.vocab_size, vb.pp("lm_head")).map_err(ce)?
+                } else {
+                    Linear::new(
+                        vb.get((cfg.vocab_size, cfg.hidden_size), "model.embed_tokens.weight").map_err(ce)?,
+                        None,
+                    )
+                };
+                Lm::Qwen2 { base, lm_head }
+            }
+            "llama" | "mistral" => {
+                let lc: llama::LlamaConfig = md.config_as()?;
+                let cfg = lc.into_config(false);
+                let model = llama::Llama::load(vb, &cfg).map_err(ce)?;
+                let cache = llama::Cache::new(true, dtype, &cfg, device).map_err(ce)?;
+                Lm::Llama(Box::new(LlamaLm { model, cfg, cache, dtype, device: device.clone() }))
+            }
+            other => return Err(model_err(dir, format!("unsupported decoder model_type `{other}` (qwen2, llama)"))),
+        };
+        Ok(Self(lm))
+    }
+
+    /// Logits `(seq, vocab)` for every position of `ids`, keeping the autograd graph. Qwen2 runs
+    /// one pass; Llama feeds tokens one at a time (candle's Llama returns only the last position).
+    pub fn logits_all(&mut self, ids: &[u32]) -> candle_core::Result<Tensor> {
+        self.0.reset()?;
+        match &mut self.0 {
+            Lm::Qwen2 { base, lm_head } => {
+                let x = Tensor::new(ids, &lm_head.weight().device().clone())?.unsqueeze(0)?;
+                lm_head.forward(&base.forward(&x, 0, None)?)?.squeeze(0)
+            }
+            Lm::Llama(l) => {
+                let mut rows = Vec::with_capacity(ids.len());
+                for (i, &t) in ids.iter().enumerate() {
+                    let x = Tensor::new(&[t], &l.device)?.unsqueeze(0)?;
+                    rows.push(l.model.forward(&x, i, &mut l.cache)?.squeeze(0)?);
+                }
+                Tensor::stack(&rows, 0)
+            }
+        }
+    }
+}
+
 /// A local causal language model.
 ///
 /// ```no_run
@@ -119,32 +175,19 @@ impl TextGenerator {
 
     /// Load with an explicit device and dtype (e.g. `DType::BF16` on GPU).
     pub fn load_with(dir: &Path, device: &Device, dtype: DType) -> Result<Self> {
+        Self::load_with_adapter(dir, None, device, dtype)
+    }
+
+    /// Load with a PEFT-format LoRA adapter (`adapter_config.json` +
+    /// `adapter_model.safetensors`, as written by `harpia-train`) merged into the weights.
+    pub fn load_with_adapter(dir: &Path, adapter: Option<&Path>, device: &Device, dtype: DType) -> Result<Self> {
         let md = ModelDir::open(dir)?;
-        let vb = md.var_builder(dtype, device)?;
-        let ce = |e: candle_core::Error| model_err(dir, e);
-        let lm = match md.model_type() {
-            "qwen2" => {
-                let cfg: qwen2::Config = md.config_as()?;
-                let base = qwen2::Model::new(&cfg, vb.clone()).map_err(ce)?;
-                let lm_head = if vb.contains_tensor("lm_head.weight") {
-                    linear_no_bias(cfg.hidden_size, cfg.vocab_size, vb.pp("lm_head")).map_err(ce)?
-                } else {
-                    Linear::new(
-                        vb.get((cfg.vocab_size, cfg.hidden_size), "model.embed_tokens.weight").map_err(ce)?,
-                        None,
-                    )
-                };
-                Lm::Qwen2 { base, lm_head }
-            }
-            "llama" | "mistral" => {
-                let lc: llama::LlamaConfig = md.config_as()?;
-                let cfg = lc.into_config(false);
-                let model = llama::Llama::load(vb, &cfg).map_err(ce)?;
-                let cache = llama::Cache::new(true, dtype, &cfg, device).map_err(ce)?;
-                Lm::Llama(Box::new(LlamaLm { model, cfg, cache, dtype, device: device.clone() }))
-            }
-            other => return Err(model_err(dir, format!("unsupported decoder model_type `{other}` (qwen2, llama)"))),
-        };
+        let mut tensors = md.tensors(device)?;
+        if let Some(a) = adapter {
+            crate::adapter::merge_lora(&mut tensors, a, device)?;
+        }
+        let vb = VarBuilder::from_tensors(tensors, dtype, device);
+        let lm = CausalLm::from_var_builder(&md, vb, dtype, device)?.0;
         let tokenizer = md.tokenizer()?;
         let mut eos = md.token_ids("eos_token_id");
         if let Ok(gc) = std::fs::read_to_string(dir.join("generation_config.json"))

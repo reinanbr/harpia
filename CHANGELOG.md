@@ -30,6 +30,14 @@ All notable changes to this project are documented here. The format follows
   transformers on errei-cita-v1: max |Δlogit| 1.0e-5.
 - CLI: `classify`, `generate`, `translate`, `embed`, and `chat --provider local`.
 - Umbrella features `local`, `cuda`, `metal` (the last two pull native code).
+- `harpia-train`: `train_classifier` (full fine-tuning with head reuse/remap, class-weighted
+  loss, AdamW, warmup + decay, clipping, macro-F1 model selection, HF-format checkpoints),
+  `train_lora_sft` and experimental `train_lora_dpo` with PEFT-format adapters, differentiable
+  `nn` forward passes for XLM-R/BERT/Qwen2/Llama, and a fused AdamW.
+- `harpia-local`: `CausalLm`, `TextGenerator::load_with_adapter` (PEFT LoRA merge),
+  `SequenceClassifier::{from_parts, batch_logits, encode_input}`.
+- CLI: `harpia train classifier|sft|dpo`.
+- Umbrella feature `train`.
 
 ### Changed
 
