@@ -14,7 +14,7 @@
 //! | `local` | `harpia-local` | `local` (+ `cuda`/`metal`) | stable |
 //! | `train` | `harpia-train` | `train` | stable (DPO experimental) |
 //! | `eval` | `harpia-eval` | `eval` | stable |
-//! | — | `harpia-verify` | — | planned |
+//! | `verify` | `harpia-verify` | `verify` (+ `verify-*` adapters, `verify-llm`) | stable |
 //!
 //! ```
 //! # #[cfg(all(feature = "data", feature = "structured"))] {
@@ -48,5 +48,7 @@ pub use harpia_structured as structured;
 pub use harpia_text as text;
 #[cfg(feature = "train")]
 pub use harpia_train as train;
+#[cfg(feature = "verify")]
+pub use harpia_verify as verify;
 
 pub use harpia_core::{HarpiaError, NetworkPolicy, Result};

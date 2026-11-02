@@ -31,7 +31,7 @@ http = ["dep:harpia-http"]
 ## LLM API clients (OpenAI-compatible, Anthropic, Ollama), structured output, batch runner, synthetic data.
 client = ["http", "data", "structured", "dep:harpia-client", "harpia-client?/openai-compatible", "harpia-client?/anthropic", "harpia-client?/ollama"]
 ## HTTPS via rustls + `ring`. NOTE: `ring` contains C/assembly and needs a C compiler.
-tls = ["http", "harpia-http?/tls", "harpia-client?/tls"]
+tls = ["http", "harpia-http?/tls", "harpia-client?/tls", "harpia-verify?/tls"]
 ## Local inference with candle (encoders, MarianMT, Qwen2/Llama decoders). Pure Rust on CPU.
 local = ["data", "structured", "tokenizers", "dep:harpia-local"]
 ## Hugging Face Hub downloads for local models (add `tls` for https).
@@ -44,8 +44,30 @@ metal = ["local", "harpia-local?/metal"]
 train = ["local", "dep:harpia-train"]
 ## Evaluation: harness, LLM-as-judge, RAG metrics, calibration, reports, cost. Pure Rust.
 eval = ["data", "structured", "dep:harpia-eval"]
+## Grounding and fact-checking against trusted sources (core: registry, fetcher, claims, references).
+verify = ["http", "data", "eval", "dep:harpia-verify"]
+## Crossref adapter.
+verify-crossref = ["verify", "harpia-verify?/crossref"]
+## OpenAlex adapter.
+verify-openalex = ["verify", "harpia-verify?/openalex"]
+## Semantic Scholar adapter.
+verify-semantic-scholar = ["verify", "harpia-verify?/semantic-scholar"]
+## arXiv adapter.
+verify-arxiv = ["verify", "harpia-verify?/arxiv"]
+## Europe PMC adapter.
+verify-europepmc = ["verify", "harpia-verify?/europepmc"]
+## DOAJ adapter.
+verify-doaj = ["verify", "harpia-verify?/doaj"]
+## Wikipedia and Wikidata adapters.
+verify-wikipedia = ["verify", "harpia-verify?/wikipedia"]
+## Generic allowlisted web pages.
+verify-web = ["verify", "harpia-verify?/web"]
+## Every verify adapter.
+verify-all = ["verify-crossref", "verify-openalex", "verify-semantic-scholar", "verify-arxiv", "verify-europepmc", "verify-doaj", "verify-wikipedia", "verify-web"]
+## LLM assistance for verification (claim decomposition, query rewriting, summaries). Off by default.
+verify-llm = ["verify", "structured", "harpia-verify?/llm"]
 ## Everything implemented so far, in pure Rust (add `tls` for HTTPS).
-full = ["text", "data", "structured", "langid", "tokenizers", "schema", "http", "client", "local", "hub", "train", "eval"]
+full = ["text", "data", "structured", "langid", "tokenizers", "schema", "http", "client", "local", "hub", "train", "eval", "verify-all", "verify-llm"]
 
 [dependencies]
 harpia-core = { workspace = true }
@@ -57,6 +79,7 @@ harpia-client = { workspace = true, optional = true }
 harpia-local = { workspace = true, optional = true }
 harpia-train = { workspace = true, optional = true }
 harpia-eval = { workspace = true, optional = true }
+harpia-verify = { workspace = true, optional = true }
 
 [dev-dependencies]
 serde = { workspace = true }

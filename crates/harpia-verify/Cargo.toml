@@ -12,8 +12,55 @@ homepage.workspace = true
 authors.workspace = true
 readme = "README.md"
 
+[features]
+default = ["crossref", "openalex", "semantic-scholar", "arxiv", "europepmc", "doaj", "wikipedia", "web"]
+## Crossref REST API adapter.
+crossref = []
+## OpenAlex adapter.
+openalex = []
+## Semantic Scholar Graph API adapter.
+semantic-scholar = []
+## arXiv export API adapter.
+arxiv = []
+## Europe PMC adapter.
+europepmc = []
+## DOAJ adapter.
+doaj = []
+## Wikipedia and Wikidata adapters.
+wikipedia = []
+## Generic allowlisted web pages (HTML main-text extraction, robots.txt).
+web = []
+## LLM assistance: claim decomposition, query rewriting, evidence summaries.
+llm = ["dep:harpia-structured"]
+## HTTPS (rustls + ring; needs a C compiler). Without it only loopback test servers are reachable.
+tls = ["harpia-http/tls"]
+
 [dependencies]
 harpia-core = { workspace = true }
+harpia-text = { workspace = true }
+harpia-data = { workspace = true, features = ["html"] }
+harpia-http = { workspace = true }
+harpia-eval = { workspace = true }
+harpia-structured = { workspace = true, optional = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+toml = { workspace = true }
+sha2 = { workspace = true }
+tracing = { workspace = true }
+unicode-normalization = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }
+wiremock = { workspace = true }
+tempfile = { workspace = true }
+
+[[test]]
+name = "verify"
+required-features = ["wikipedia", "crossref", "openalex", "web"]
+
+[[test]]
+name = "parity_errei"
+required-features = ["crossref", "openalex"]
 
 [lints]
 workspace = true

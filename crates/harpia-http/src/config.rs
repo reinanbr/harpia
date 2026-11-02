@@ -33,6 +33,45 @@ impl CacheConfig {
     }
 }
 
+/// Predicate over a redirect target `(scheme, host)`; `false` stops the redirect.
+pub type RedirectCheck = std::sync::Arc<dyn Fn(&str, &str) -> bool + Send + Sync>;
+
+/// How redirects are handled.
+#[derive(Clone)]
+pub enum RedirectPolicy {
+    /// Follow up to `max` redirects anywhere (the default, `max = 10`).
+    Follow {
+        /// Maximum hops.
+        max: usize,
+    },
+    /// Never follow; 3xx responses are returned as-is.
+    None,
+    /// Follow up to `max` hops, but only while `check(scheme, host)` accepts every hop. A refused
+    /// hop fails the request with [`harpia_core::HarpiaError::Remote`] (not retried).
+    Checked {
+        /// Maximum hops.
+        max: usize,
+        /// Hop predicate.
+        check: RedirectCheck,
+    },
+}
+
+impl std::fmt::Debug for RedirectPolicy {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Follow { max } => write!(f, "Follow({max})"),
+            Self::None => f.write_str("None"),
+            Self::Checked { max, .. } => write!(f, "Checked({max})"),
+        }
+    }
+}
+
+impl Default for RedirectPolicy {
+    fn default() -> Self {
+        Self::Follow { max: 10 }
+    }
+}
+
 /// Configuration of an [`HttpClient`](crate::HttpClient).
 ///
 /// ```
@@ -72,6 +111,8 @@ pub struct HttpConfig {
     pub cache: Option<CacheConfig>,
     /// Header names whose values are never logged (case-insensitive).
     pub sensitive_headers: Vec<String>,
+    /// Redirect handling.
+    pub redirects: RedirectPolicy,
 }
 
 impl std::fmt::Debug for HttpConfig {
@@ -82,6 +123,7 @@ impl std::fmt::Debug for HttpConfig {
             .field("timeout", &self.timeout)
             .field("retries", &self.retries)
             .field("cache", &self.cache.as_ref().map(|c| &c.path))
+            .field("redirects", &self.redirects)
             .finish_non_exhaustive()
     }
 }
@@ -109,6 +151,7 @@ impl HttpConfig {
             max_body_bytes: 32 * 1024 * 1024,
             cache: None,
             sensitive_headers: vec!["authorization".into(), "x-api-key".into(), "api-key".into(), "cookie".into()],
+            redirects: RedirectPolicy::default(),
         }
     }
 

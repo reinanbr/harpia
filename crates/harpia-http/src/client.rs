@@ -116,6 +116,12 @@ pub struct Response {
     pub body: Vec<u8>,
     /// Served from the cache.
     pub from_cache: bool,
+    /// `Content-Type` header, when sent.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub content_type: Option<String>,
+    /// Final URL after redirects.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub url: Option<String>,
 }
 
 impl Response {
@@ -221,9 +227,29 @@ impl HttpClient {
     /// Build a client.
     pub fn new(cfg: HttpConfig) -> Result<Self> {
         install_crypto_provider();
+        let redirect = match &cfg.redirects {
+            crate::config::RedirectPolicy::Follow { max } => reqwest::redirect::Policy::limited(*max),
+            crate::config::RedirectPolicy::None => reqwest::redirect::Policy::none(),
+            crate::config::RedirectPolicy::Checked { max, check } => {
+                let (max, check) = (*max, check.clone());
+                reqwest::redirect::Policy::custom(move |attempt| {
+                    if attempt.previous().len() > max {
+                        return attempt.error(format!("more than {max} redirects"));
+                    }
+                    let u = attempt.url();
+                    if check(u.scheme(), u.host_str().unwrap_or("")) {
+                        attempt.follow()
+                    } else {
+                        let msg = format!("redirect to disallowed {}://{}", u.scheme(), u.host_str().unwrap_or(""));
+                        attempt.error(msg)
+                    }
+                })
+            }
+        };
         let inner = reqwest::Client::builder()
             .user_agent(cfg.user_agent())
             .timeout(cfg.timeout)
+            .redirect(redirect)
             .build()
             .map_err(|e| HarpiaError::Other(format!("cannot build HTTP client: {e}")))?;
         let cache = match &cfg.cache {
@@ -396,6 +422,14 @@ impl HttpClient {
             self.sent.fetch_add(1, Ordering::Relaxed);
             tracing::debug!(method = ?req.method, host, attempt, "http request");
             match self.build(req, url.clone()).send().await {
+                Err(e) if e.is_redirect() => {
+                    // A refused or looping redirect is a policy decision, not a transient failure.
+                    let msg = match std::error::Error::source(&e) {
+                        Some(src) => src.to_string(),
+                        None => e.without_url().to_string(),
+                    };
+                    return Err(HarpiaError::Remote { host: host.to_string(), message: msg });
+                }
                 Err(e) => {
                     last_err =
                         if e.is_timeout() { "timeout".into() } else { format!("transport error: {}", e.without_url()) };
@@ -439,8 +473,11 @@ impl HttpClient {
         }
         let resp = self.send_with_retries(&req, &url, &host).await?;
         let status = resp.status().as_u16();
+        let content_type =
+            resp.headers().get("content-type").and_then(|v| v.to_str().ok()).map(|s| s.trim().to_string());
+        let final_url = Some(resp.url().to_string());
         let body = read_capped(resp, self.cfg.max_body_bytes, &host).await?;
-        let out = Response { status, body, from_cache: false };
+        let out = Response { status, body, from_cache: false, content_type, url: final_url };
         if let (Some(k), Some(c), Some(cc)) = (&key, &self.cache, &self.cfg.cache)
             && cc.statuses.contains(&status)
             && let Ok(bytes) = serde_json::to_vec(&out)

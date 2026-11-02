@@ -6,6 +6,25 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added (milestone 6: verify)
+
+- `harpia-verify`: TOML `SourceRegistry` (built-in Crossref, OpenAlex, Semantic Scholar, arXiv,
+  Europe PMC, DOAJ, Wikipedia en/pt, Wikidata, open-access full texts; extend / restrict /
+  replace), `Fetcher` (offline by default, HTTPS only, per-source host allowlist checked on
+  every redirect hop, size and content-type caps, `robots.txt` for HTML, `Disclosure` log,
+  content store with `Live` / `CachedFirst` / `Frozen` modes), adapters behind features, the
+  `SourceAdapter` trait for custom sources, `ClaimVerifier` (keyword queries, BM25 passages,
+  NLI windows, calibrated decisions, tier-aware aggregation that reports disagreement),
+  answer and dataset grounding, `ReferenceVerifier` (DOI / arXiv lookups, search, weighted
+  fuzzy matching, retraction and correction flags), quote checks by page, a BibTeX reader,
+  trusted documents for `RagPipeline`, optional LLM assistance (`llm`).
+- Replay parity with errei's reference classification on its recorded HTTP fixtures.
+- `harpia-http`: `RedirectPolicy` (follow, none, or checked per hop), `Response::content_type`
+  and final `url`.
+- `harpia-data`: feature `html` (dependency-free HTML to text, main-content extraction, link
+  extraction, entity decoding).
+- Umbrella features `verify`, `verify-*` per adapter, `verify-all`, `verify-llm`.
+
 ### Added (milestone 5: eval and RAG retrieval)
 
 - `harpia-eval`: evaluation harness (TOML/JSON tasks: generation, multiple choice by

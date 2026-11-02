@@ -39,4 +39,4 @@ pub mod ratelimit;
 pub mod testing;
 
 pub use client::{ByteStream, HostStatus, HttpClient, Method, Request, Response, StreamingResponse, parse_retry_after};
-pub use config::{CacheConfig, HttpConfig};
+pub use config::{CacheConfig, HttpConfig, RedirectCheck, RedirectPolicy};

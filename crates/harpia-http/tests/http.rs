@@ -161,3 +161,45 @@ async fn download_to_file_is_atomic_and_capped() {
     );
     assert_eq!(std::fs::read(&dest).unwrap().len(), 5000);
 }
+
+#[tokio::test]
+async fn checked_redirects_stay_on_allowed_hosts() {
+    use harpia_http::RedirectPolicy;
+    use std::sync::Arc;
+    let server = MockServer::start().await;
+    let port = server.address().port();
+    Mock::given(path("/ok-hop"))
+        .respond_with(ResponseTemplate::new(302).insert_header("location", "/final"))
+        .mount(&server)
+        .await;
+    Mock::given(path("/final"))
+        .respond_with(
+            ResponseTemplate::new(200)
+                .insert_header("content-type", "text/plain; charset=utf-8")
+                .set_body_string("done"),
+        )
+        .mount(&server)
+        .await;
+    // Same server reached under another host name: must be refused by the predicate.
+    Mock::given(path("/bad-hop"))
+        .respond_with(ResponseTemplate::new(302).insert_header("location", format!("http://localhost:{port}/final")))
+        .expect(1)
+        .mount(&server)
+        .await;
+    let mut cfg = online();
+    cfg.redirects =
+        RedirectPolicy::Checked { max: 3, check: Arc::new(|scheme, host| scheme == "http" && host == "127.0.0.1") };
+    let client = HttpClient::new(cfg).unwrap();
+    let r = client.send(Request::get(format!("{}/ok-hop", server.uri()))).await.unwrap();
+    assert_eq!((r.status, r.text().as_str()), (200, "done"));
+    assert!(r.content_type.as_deref().is_some_and(|c| c.starts_with("text/plain")));
+    assert!(r.url.unwrap().ends_with("/final"));
+    let err = client.send(Request::get(format!("{}/bad-hop", server.uri()))).await.unwrap_err();
+    assert!(err.to_string().contains("disallowed"), "{err}");
+    // Not retried: the mock expects exactly one call.
+
+    let mut cfg = online();
+    cfg.redirects = RedirectPolicy::None;
+    let r = HttpClient::new(cfg).unwrap().send(Request::get(format!("{}/ok-hop", server.uri()))).await.unwrap();
+    assert_eq!(r.status, 302);
+}

@@ -1,0 +1,101 @@
+# Built-in trusted sources. Extend, restrict or replace them with your own registry file.
+# Tier 1 = primary / peer-reviewed metadata, 2 = curated reference, 3 = general.
+
+[[sources]]
+id = "crossref"
+name = "Crossref"
+kind = "scholarly-api"
+domains = ["api.crossref.org"]
+tier = 1
+min_interval_ms = 100
+contact_env = "HARPIA_CONTACT_EMAIL"
+adapter = "crossref"
+
+[[sources]]
+id = "openalex"
+name = "OpenAlex"
+kind = "scholarly-api"
+domains = ["api.openalex.org"]
+tier = 1
+min_interval_ms = 100
+contact_env = "HARPIA_CONTACT_EMAIL"
+adapter = "openalex"
+
+[[sources]]
+id = "semantic-scholar"
+name = "Semantic Scholar"
+kind = "scholarly-api"
+domains = ["api.semanticscholar.org"]
+tier = 1
+min_interval_ms = 1100
+api_key_env = "SEMANTIC_SCHOLAR_API_KEY"
+adapter = "semantic-scholar"
+
+[[sources]]
+id = "arxiv"
+name = "arXiv"
+kind = "scholarly-api"
+domains = ["export.arxiv.org"]
+tier = 2
+min_interval_ms = 3000
+adapter = "arxiv"
+
+[[sources]]
+id = "europepmc"
+name = "Europe PMC"
+kind = "scholarly-api"
+domains = ["www.ebi.ac.uk"]
+tier = 1
+min_interval_ms = 200
+adapter = "europepmc"
+
+[[sources]]
+id = "doaj"
+name = "Directory of Open Access Journals"
+kind = "scholarly-api"
+domains = ["doaj.org"]
+tier = 1
+min_interval_ms = 500
+adapter = "doaj"
+
+[[sources]]
+id = "wikipedia-en"
+name = "Wikipedia (English)"
+kind = "encyclopedia"
+domains = ["en.wikipedia.org"]
+tier = 2
+min_interval_ms = 200
+adapter = "wikipedia"
+lang = "en"
+license = "CC-BY-SA-4.0"
+
+[[sources]]
+id = "wikipedia-pt"
+name = "Wikipedia (Português)"
+kind = "encyclopedia"
+domains = ["pt.wikipedia.org"]
+tier = 2
+min_interval_ms = 200
+adapter = "wikipedia"
+lang = "pt"
+license = "CC-BY-SA-4.0"
+
+[[sources]]
+id = "wikidata"
+name = "Wikidata"
+kind = "encyclopedia"
+domains = ["www.wikidata.org"]
+tier = 2
+min_interval_ms = 200
+adapter = "wikidata"
+lang = "en"
+license = "CC0-1.0"
+
+[[sources]]
+id = "open-access-pdf"
+name = "Open-access full texts reported by scholarly APIs"
+kind = "scholarly-api"
+domains = ["arxiv.org", "export.arxiv.org", "europepmc.org", "www.ncbi.nlm.nih.gov", "*.scielo.br", "*.plos.org", "*.biomedcentral.com", "*.springeropen.com", "*.frontiersin.org", "*.mdpi.com"]
+tier = 1
+min_interval_ms = 1000
+adapter = "open-access-pdf"

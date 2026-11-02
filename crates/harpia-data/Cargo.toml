@@ -16,6 +16,8 @@ readme = "README.md"
 default = ["langid"]
 ## Language identification filter (via harpia-text).
 langid = ["harpia-text/langid"]
+## HTML to text and main-content extraction (pure Rust, no extra dependencies).
+html = []
 ## Hugging Face `tokenizers` backend (pure Rust: no `onig`, no `esaxx` C++).
 tokenizers = ["dep:tokenizers"]
 

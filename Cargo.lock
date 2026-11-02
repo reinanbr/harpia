@@ -1421,6 +1421,7 @@ dependencies = [
  "harpia-structured",
  "harpia-text",
  "harpia-train",
+ "harpia-verify",
  "serde",
  "serde_json",
  "tokio",
@@ -1610,6 +1611,20 @@ name = "harpia-verify"
 version = "0.1.0"
 dependencies = [
  "harpia-core",
+ "harpia-data",
+ "harpia-eval",
+ "harpia-http",
+ "harpia-structured",
+ "harpia-text",
+ "serde",
+ "serde_json",
+ "sha2 0.11.1",
+ "tempfile",
+ "tokio",
+ "toml",
+ "tracing",
+ "unicode-normalization",
+ "wiremock",
 ]
 
 [[package]]

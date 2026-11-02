@@ -36,7 +36,7 @@ harpia-client = { path = "crates/harpia-client", version = "0.1.0", default-feat
 harpia-local = { path = "crates/harpia-local", version = "0.1.0" }
 harpia-train = { path = "crates/harpia-train", version = "0.1.0" }
 harpia-eval = { path = "crates/harpia-eval", version = "0.1.0" }
-harpia-verify = { path = "crates/harpia-verify", version = "0.1.0" }
+harpia-verify = { path = "crates/harpia-verify", version = "0.1.0", default-features = false }
 harpia = { path = "crates/harpia", version = "0.1.0" }
 
 # external (pure Rust; audit features before adding anything here)

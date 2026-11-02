@@ -44,10 +44,10 @@ Harpia covers the full lifecycle of **data and large language models**:
 | `harpia-local` | candle inference: sequence/pair classifiers and rerankers (BERT, RoBERTa, XLM-R; parity with transformers 1e-5), embeddings, Qwen2/Llama generation with constrained decoding and log-probs, MarianMT straight from Hub SentencePiece files (parity with transformers) | **stable** |
 | `harpia-train` | classifier / cross-encoder fine-tuning (verified on a real XLM-R model; checkpoints load in transformers), LoRA SFT with PEFT export, DPO (experimental); every run writes `train.json` and a model card | **stable** |
 | `harpia-eval` | eval harness (generation, multiple choice, perplexity, classification; few-shot, cached), LLM-as-judge with position swap and agreement, RAG metrics and faithfulness, generation and classification metrics, threshold calibration applied frozen, best-of-N windows, leaderboards, model cards, cost tracking | **stable** |
-| `harpia-verify` | grounding against trusted sources | planned (milestone 6) |
+| `harpia-verify` | grounding and fact-checking against user-trusted sources: TOML source registry with hard host allowlist, offline-by-default fetcher (HTTPS only, redirect checks, `robots.txt`, size/type caps, disclosure log, frozen replay), adapters for Crossref, OpenAlex, Semantic Scholar, arXiv, Europe PMC, DOAJ, Wikipedia/Wikidata and allowlisted web pages, claim verification with NLI and tier-aware aggregation, answer and dataset grounding, reference and quote checks, BibTeX | **stable** |
 
 "Stable" means implemented, documented and tested in this release; the API may still change
-before 1.0. Planned crates reserve their names and document their scope but expose no API.
+before 1.0.
 
 ## Quick start
 
@@ -138,10 +138,14 @@ environment error.
 | `client` | no | `harpia::client` (OpenAI-compatible, Anthropic, Ollama, batch runner, synthesis) | no |
 | `local` | no | `harpia::local` (candle, CPU) | no |
 | `train` | no | `harpia::train` (fine-tuning) | no |
+| `eval` | no | `harpia::eval` (harness, judges, RAG metrics, calibration, reports, cost) | no |
+| `verify` | no | `harpia::verify` core (registry, fetcher, claims, references, BibTeX) | no |
+| `verify-crossref`, `verify-openalex`, `verify-semantic-scholar`, `verify-arxiv`, `verify-europepmc`, `verify-doaj`, `verify-wikipedia`, `verify-web` | no | one trusted-source adapter each (`verify-all` for every one) | no |
+| `verify-llm` | no | LLM assistance for verification (claim decomposition, query rewriting, summaries) | no |
 | `full` | no | all of the above | no |
 | `cuda` | no | NVIDIA GPU inference | **yes** (CUDA toolkit) |
 | `metal` | no | Apple GPU inference | **yes** (Metal) |
-| `tls` | no | HTTPS for `http`/`client` via rustls + `ring` | **yes** (`ring`: C/assembly) |
+| `tls` | no | HTTPS for `http`/`client`/`verify` via rustls + `ring` (verification needs it for real sources) | **yes** (`ring`: C/assembly) |
 
 The `harpia-cli` binary enables `tls` by default; `cargo install harpia-cli --no-default-features`
 builds a pure-Rust binary for local `http://` servers.
@@ -175,12 +179,65 @@ See [`docs/models.md`](docs/models.md) for supported architectures, verification
 
 ## Grounding against trusted sources
 
-`harpia-verify` (planned, milestone 6) will check LLM answers, RAG outputs and synthetic
-training rows against **sources you trust**: an allowlist registry in TOML (HTTPS only,
-redirects must stay on allowed hosts, `robots.txt` respected), adapters for Crossref,
-OpenAlex, Semantic Scholar, arXiv, Europe PMC, Wikipedia/Wikidata and user-added domains, a
-keywords-only query default and a `Disclosure` log of everything sent. Results are indicators
-with evidence and provenance, never verdicts.
+`harpia-verify` checks claims against **sources you trust** wherever a pipeline needs it:
+grounding LLM answers claim by claim, web-grounded RAG (trusted sources become `RagPipeline`
+documents with citations), filtering synthetic or scraped training rows whose claims are
+contradicted, and checking that cited works exist and match their metadata.
+
+**Registry and allowlist.** Sources live in a TOML registry: id, kind, allowed hosts (exact or
+`*.suffix`), trust tier (1 = primary/peer-reviewed, 2 = curated reference, 3 = general),
+politeness interval, contact/API-key environment variables and adapter. Every request and
+every redirect hop must stay on an allowed host; only HTTPS; bodies are size- and type-capped;
+HTML pages are fetched only when `robots.txt` allows; no cookies, JavaScript, logins or paywall
+circumvention; APIs are used through their documented endpoints only.
+
+**Built-in sources** (each behind a `verify-*` feature): Crossref, OpenAlex, Semantic Scholar,
+arXiv, Europe PMC, DOAJ, Wikipedia (en, pt) and Wikidata, open-access full texts reported by
+those APIs, and `GenericAllowlistedWeb` for your own domains. Implement `SourceAdapter` to add
+private document stores without forking.
+
+```toml
+# trusted.toml: extends (or, with `restrict`, replaces) the built-in list
+[[sources]]
+id = "handbook"
+name = "Engineering handbook"
+kind = "docs"
+domains = ["handbook.example.org"]
+tier = 1
+adapter = "web"
+search_url = "https://handbook.example.org/search?q={query}"
+
+[[sources]]
+id = "semantic-scholar"          # same id: replaces the built-in entry
+name = "Semantic Scholar (keyed)"
+kind = "scholarly-api"
+domains = ["api.semanticscholar.org"]
+tier = 1
+min_interval_ms = 300
+api_key_env = "SEMANTIC_SCHOLAR_API_KEY"
+adapter = "semantic-scholar"
+```
+
+**Privacy.** Nothing leaves the machine unless the network policy is `Online` (`--online` in the
+CLI); offline, every check returns `Skipped { reason }` without opening a socket. Queries are
+keywords only by default (`QueryMode::FullText` is opt-in), and every outgoing request is listed
+in a `Disclosure` log returned with the results (contact e-mails redacted). A content store keeps
+every fetched response with URL, time and SHA-256; `Mode::Frozen` answers only from it, offline,
+for reproducible dataset builds and evaluations.
+
+**Results are indicators, not verdicts.** Claims come back as `Supported`, `Contradicted`,
+`NotEnoughInfo` or `Unavailable` with confidence and evidence (source, tier, URL, passage, byte
+span, scores, retrieval time, content hash). Aggregation across sources is explicit: a tier-1
+contradiction is never hidden by tier-3 support, and disagreement is reported, not averaged.
+References come back as `Confirmed`, `Divergent { fields }`, `NotFound` or `Unavailable`, with
+retraction and correction flags; quoted passages can be located in open full text by page.
+An optional LLM (`verify-llm`) can decompose claims, rewrite queries and summarize evidence, but
+never sets a status, and its use is recorded.
+
+**Limitations.** "Not found" is not "false": many works and facts are simply not indexed.
+`NotEnoughInfo` is the normal outcome when sources do not cover the point. NLI classifiers
+degrade out of domain; calibrate thresholds on your own validation data (`harpia-eval`). Which
+sources are trustworthy is your configuration, not Harpia's judgment.
 
 ## Built on Harpia
 
@@ -201,7 +258,8 @@ reference checking) are mapped to Harpia APIs in `docs/errei-mapping.md`.
    to come: embedding fine-tuning, QLoRA, optimizer-state checkpoints.
 5. **eval**: done: harness, judges, RAG metrics, calibration, model cards, cost tracking; RAG
    retrieval (flat/HNSW, BM25, hybrid, rerank, `RagPipeline`) in `harpia-data`.
-6. **verify**: trusted-source registry, adapters, claim and reference verification.
+6. **verify**: done: trusted-source registry and allowlist enforcement, adapters, claim, answer
+   and dataset verification, references and quotes.
 7. **serve**: `harpia serve --stdio` (JSON-RPC) and an OpenAI-compatible `serve --http`.
 
 Also planned for `harpia-data`: Parquet/Arrow, HTML and PDF readers, Hugging Face Hub

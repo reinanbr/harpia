@@ -31,6 +31,8 @@ pub mod decontam;
 pub mod dedup;
 pub mod filter;
 pub mod format;
+#[cfg(feature = "html")]
+pub mod html;
 pub mod io;
 pub mod pack;
 pub mod pii;
