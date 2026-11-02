@@ -24,9 +24,13 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 rayon = { workspace = true }
 futures-core = { workspace = true }
+harpia-http = { workspace = true, optional = true }
 
 [features]
 default = []
+## Hugging Face Hub downloads through harpia-http (explicit cache dir, respects NetworkPolicy).
+## Combine with `harpia-http/tls` (or the umbrella `tls`) for https://huggingface.co.
+hub = ["dep:harpia-http"]
 ## NVIDIA GPUs (native code: CUDA toolkit).
 cuda = ["candle-core/cuda", "candle-nn/cuda", "candle-transformers/cuda"]
 ## Apple GPUs (native code: Metal).

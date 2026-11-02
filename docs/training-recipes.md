@@ -44,9 +44,13 @@ The frozen base model is the reference policy.
 
 ## Known differences and limits
 
-- No dropout during training.
-- Optimizer moments are not checkpointed; only the best weights are saved.
-- LoRA dropout is not supported; LoRA targets the attention and MLP projections by default.
+- Dropout follows the model's `config.json` (`hidden_dropout_prob`, `attention_probs_dropout_prob`,
+  `classifier_dropout`) as in transformers; override with `--dropout` (0 disables). LoRA dropout
+  (`--lora-dropout`) applies to the adapter input, as in PEFT. Masks are seeded per epoch.
+- Every epoch writes `<out>/checkpoint/` (trainable weights, AdamW moments, RNG, history);
+  `--resume` continues a run exactly (tests check bit-identical results) and `--stop-after N`
+  time-boxes a run.
+- LoRA targets the attention and MLP projections by default.
 - Training uses Harpia's own differentiable forward passes (`harpia_train::nn`), because
   candle-nn's fused kernels (softmax, layer/RMS norm, rotary embeddings) have no backward pass.
   Tests check that these forwards match `harpia-local` inference within 1e-4 and that gradients

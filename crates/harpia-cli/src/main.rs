@@ -63,6 +63,8 @@ enum Command {
     Translate(local_cmd::TranslateArgs),
     /// Add sentence embeddings to JSONL rows with a local encoder model.
     Embed(local_cmd::EmbedArgs),
+    /// Download a model snapshot from the Hugging Face Hub (needs --online).
+    Download(local_cmd::DownloadArgs),
     /// Fine-tune models (classifier, LoRA SFT, DPO).
     #[command(subcommand)]
     Train(train_cmd::TrainCommand),
@@ -85,6 +87,7 @@ fn main() -> ExitCode {
         Command::Classify(a) => local_cmd::classify(a, cli.format),
         Command::Translate(a) => local_cmd::translate(a, cli.format),
         Command::Embed(a) => local_cmd::embed(a, cli.format),
+        Command::Download(a) => local_cmd::download(a, cli.format),
         Command::Data(c) => data_cmd::run(c, cli.format),
         Command::Train(c) => train_cmd::run(c, cli.format),
     };

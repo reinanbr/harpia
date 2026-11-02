@@ -62,3 +62,17 @@ a smoke test, not a quality claim. Harpia is roughly 1.7× slower and uses 2.3×
 backward pass of candle's CPU autodiff dominates (≈4 s of ≈6 s per step); the fused AdamW brought
 the optimizer step from 3.3 s to 0.7 s. The saved checkpoint loads in transformers and gives the
 same probabilities to 6 decimals.
+
+## Text generation (Qwen2.5-0.5B-Instruct, f32, CPU)
+
+Greedy decoding on the same 33-token chat prompt, same machine.
+
+| | throughput |
+|---|---:|
+| Harpia `TextGenerator` (candle 0.11; candle's own forward is 0.235 s/token) | 3.3–3.6 tok/s |
+| transformers 5.22.1 `generate()` (40 tokens incl. prefill), torch 2.15.0+cpu, 8 threads | 1.3 tok/s |
+
+## LoRA SFT (Qwen2.5-0.5B-Instruct, r=8, f32, CPU)
+
+Six optimizer steps over three short chat samples (~50 tokens each): 43 s (≈7 s per step),
+peak RSS 8.5 GB; 168 adapted matrices, 4.4 M trainable parameters. No PyTorch comparison yet.

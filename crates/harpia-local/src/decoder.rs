@@ -159,6 +159,7 @@ pub struct TextGenerator {
     id: String,
     dir: PathBuf,
     vocab: OnceLock<Vec<String>>,
+    defaults: GenerationParams,
 }
 
 impl std::fmt::Debug for TextGenerator {
@@ -190,9 +191,11 @@ impl TextGenerator {
         let lm = CausalLm::from_var_builder(&md, vb, dtype, device)?.0;
         let tokenizer = md.tokenizer()?;
         let mut eos = md.token_ids("eos_token_id");
+        let mut defaults = GenerationParams::default();
         if let Ok(gc) = std::fs::read_to_string(dir.join("generation_config.json"))
             && let Ok(v) = serde_json::from_str::<serde_json::Value>(&gc)
         {
+            defaults = params_from_generation_config(&v);
             let gmd = ModelDir { root: dir.to_path_buf(), config: v };
             eos.extend(gmd.token_ids("eos_token_id"));
         }
@@ -218,12 +221,19 @@ impl TextGenerator {
             id: dir.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_else(|| "local".into()),
             dir: dir.to_path_buf(),
             vocab: OnceLock::new(),
+            defaults,
         })
     }
 
     /// The tokenizer.
     pub fn tokenizer(&self) -> &HfTokenizer {
         &self.tokenizer
+    }
+
+    /// Decoding defaults from the model's `generation_config.json` (what transformers uses when
+    /// the caller does not override them); library defaults when the file is absent.
+    pub fn default_params(&self) -> GenerationParams {
+        self.defaults.clone()
     }
 
     /// End-of-sequence token ids.
@@ -262,13 +272,14 @@ impl TextGenerator {
         let prompt_len = prompt_ids.len();
         let mut sampler = Sampler::new(params);
         let mut generated: Vec<u32> = Vec::new();
+        let mut context: Vec<u32> = prompt_ids.to_vec();
         let mut logprobs = Vec::new();
         let mut text = String::new();
         let mut finish = FinishReason::Length;
         let vocab = if constraint.is_some() { Some(self.vocab()) } else { None };
         for step in 0..params.max_new_tokens as usize {
             let raw = log_softmax(&logits);
-            apply_penalties(&mut logits, &generated, params);
+            apply_penalties(&mut logits, &context, &generated, params);
             let choice = match (constraint, vocab) {
                 (Some(c), Some(v)) => {
                     let complete = c.check(&text) == PrefixStatus::Complete;
@@ -293,6 +304,7 @@ impl TextGenerator {
                 break;
             }
             generated.push(tok);
+            context.push(tok);
             logprobs.push(raw[tok as usize]);
             let new_text = self.tokenizer.decode(&generated, true)?;
             if let Some(delta) = new_text.strip_prefix(text.as_str()) {
@@ -416,4 +428,22 @@ fn futures_util_stream(items: Vec<Result<ChatChunk>>) -> impl futures_core::Stre
         }
     }
     Iter(items.into_iter())
+}
+
+/// Decoding parameters from a Hugging Face `generation_config.json` (`do_sample: false` or a
+/// missing `do_sample` means greedy, as in transformers).
+pub fn params_from_generation_config(v: &serde_json::Value) -> GenerationParams {
+    let mut p = GenerationParams::default();
+    let sample = v["do_sample"].as_bool().unwrap_or(false);
+    if sample {
+        p.temperature = v["temperature"].as_f64().unwrap_or(1.0) as f32;
+        p.top_p = v["top_p"].as_f64().unwrap_or(1.0) as f32;
+        p.top_k = v["top_k"].as_u64().unwrap_or(0) as u32;
+        p.min_p = v["min_p"].as_f64().unwrap_or(0.0) as f32;
+    }
+    p.repetition_penalty = v["repetition_penalty"].as_f64().unwrap_or(1.0) as f32;
+    if let Some(n) = v["max_new_tokens"].as_u64() {
+        p.max_new_tokens = n as u32;
+    }
+    p
 }

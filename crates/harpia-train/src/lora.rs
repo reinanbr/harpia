@@ -30,6 +30,8 @@ pub struct LoraConfig {
     pub alpha: f64,
     /// Linear layers to adapt (last path component of the weight name).
     pub target_modules: Vec<String>,
+    /// Dropout on the adapter input during training (PEFT `lora_dropout`).
+    pub dropout: f64,
 }
 
 impl Default for LoraConfig {
@@ -41,6 +43,7 @@ impl Default for LoraConfig {
                 .iter()
                 .map(|s| s.to_string())
                 .collect(),
+            dropout: 0.0,
         }
     }
 }
@@ -73,6 +76,10 @@ pub struct LoraTrainConfig {
     pub save_merged: bool,
     /// DPO temperature (DPO only).
     pub beta: f64,
+    /// Continue from `<out>/checkpoint/` when present.
+    pub resume: bool,
+    /// Stop after this epoch (time-boxed runs; continue later with `resume`).
+    pub stop_after: Option<usize>,
 }
 
 impl Default for LoraTrainConfig {
@@ -90,6 +97,8 @@ impl Default for LoraTrainConfig {
             seed: 42,
             save_merged: false,
             beta: 0.1,
+            resume: false,
+            stop_after: None,
         }
     }
 }
@@ -166,10 +175,45 @@ impl Run {
         let store = TrainStore::new(tensors, Mode::Frozen, &device, cfg.seed)
             .map_err(err)?
             .with_lora(lora, cfg.lora.alpha / cfg.lora.r.max(1) as f64);
-        let net = DecoderLm::new(&md.config, &store).map_err(err)?;
+        let net =
+            DecoderLm::new(&md.config, &store).map_err(err)?.with_lora_dropout(cfg.lora.dropout, cfg.seed ^ 0xD20);
         let vars = store.trainable();
         let opt = GroupedAdamW::new(&vars, cfg.lr, cfg.weight_decay)?;
         Ok(Self { md, store, net, vars, opt, device })
+    }
+
+    /// Restore a checkpoint when `cfg.resume`; returns the first epoch to run.
+    fn resume(
+        &mut self,
+        out: &Path,
+        cfg: &LoraTrainConfig,
+        rng: &mut SplitMix64,
+        losses: &mut Vec<f64>,
+    ) -> Result<usize> {
+        if !cfg.resume {
+            return Ok(1);
+        }
+        let Some(state) = crate::checkpoint::load(&crate::checkpoint::checkpoint_dir(out), &self.vars, &mut self.opt)?
+        else {
+            return Ok(1);
+        };
+        *rng = SplitMix64::from_state(state["rng"].as_u64().unwrap_or(cfg.seed));
+        *losses = serde_json::from_value(state["losses"].clone())?;
+        Ok(state["epoch"].as_u64().unwrap_or(0) as usize + 1)
+    }
+
+    /// Save the epoch checkpoint; `true` when the run should stop (`stop_after`).
+    fn end_epoch(
+        &self,
+        out: &Path,
+        cfg: &LoraTrainConfig,
+        epoch: usize,
+        rng: &SplitMix64,
+        losses: &[f64],
+    ) -> Result<bool> {
+        let state = serde_json::json!({"epoch": epoch, "rng": rng.state(), "losses": losses});
+        crate::checkpoint::save(&crate::checkpoint::checkpoint_dir(out), &self.vars, &self.opt, &state)?;
+        Ok(cfg.stop_after == Some(epoch))
     }
 
     fn update(&mut self, loss: &Tensor, cfg: &LoraTrainConfig, step: usize, total: usize) -> Result<f64> {
@@ -193,7 +237,7 @@ impl Run {
             r: cfg.lora.r,
             lora_alpha: cfg.lora.alpha,
             target_modules: cfg.lora.target_modules.clone(),
-            lora_dropout: 0.0,
+            lora_dropout: cfg.lora.dropout,
             bias: "none".into(),
             task_type: Some("CAUSAL_LM".into()),
             base_model_name_or_path: Some(self.md.root.display().to_string()),
@@ -254,11 +298,14 @@ pub fn train_lora_sft(
         return Err(HarpiaError::invalid("no sample has trainable (masked) tokens"));
     }
     let mut run = Run::new(base, cfg)?;
+    run.net.set_training(true);
     let accum = cfg.grad_accum.max(1);
     let total = usable.len().div_ceil(accum) * cfg.epochs;
     let mut rng = SplitMix64::new(cfg.seed ^ 0x5F7);
     let mut losses = Vec::with_capacity(total);
-    for _ in 0..cfg.epochs {
+    let first = run.resume(out, cfg, &mut rng, &mut losses)?;
+    for epoch in first..=cfg.epochs {
+        run.net.reseed_dropout(cfg.seed.wrapping_add(epoch as u64));
         let mut order: Vec<usize> = (0..usable.len()).collect();
         rng.shuffle(&mut order);
         for group in order.chunks(accum) {
@@ -278,6 +325,9 @@ pub fn train_lora_sft(
             let l = run.update(&loss, cfg, losses.len(), total)?;
             losses.push(l);
             on_step(losses.len(), total, l);
+        }
+        if run.end_epoch(out, cfg, epoch, &rng, &losses)? {
+            break;
         }
     }
     let report = run.report("sft", base, cfg, losses, t0);
@@ -331,11 +381,14 @@ pub fn train_lora_dpo(
             reference.push((c, r));
         }
     }
+    run.net.set_training(true);
     let accum = cfg.grad_accum.max(1);
     let total = pairs.len().div_ceil(accum) * cfg.epochs;
     let mut rng = SplitMix64::new(cfg.seed ^ 0xD90);
     let mut losses = Vec::with_capacity(total);
-    for _ in 0..cfg.epochs {
+    let first = run.resume(out, cfg, &mut rng, &mut losses)?;
+    for epoch in first..=cfg.epochs {
+        run.net.reseed_dropout(cfg.seed.wrapping_add(epoch as u64));
         let mut order: Vec<usize> = (0..pairs.len()).collect();
         rng.shuffle(&mut order);
         for group in order.chunks(accum) {
@@ -358,6 +411,9 @@ pub fn train_lora_dpo(
             let l = run.update(&loss, cfg, losses.len(), total)?;
             losses.push(l);
             on_step(losses.len(), total, l);
+        }
+        if run.end_epoch(out, cfg, epoch, &rng, &losses)? {
+            break;
         }
     }
     let report = run.report("dpo", base, cfg, losses, t0);

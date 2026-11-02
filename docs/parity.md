@@ -35,6 +35,9 @@ place from `HARPIA_ERREI_DIR` and are never copied into this repository.
 | suite | reference | result |
 |---|---|---|
 | errei-cita-v1 (XLM-R cross-encoder, `crates/harpia-local/tests/parity_errei.rs`) | transformers 5.22.1, torch 2.15.0+cpu, f32, `max_length=192`, longest-first; 50 pairs from `pares_val.jsonl` (every 22nd line) | max \|Δlogit\| = 1.03e-5 (tolerance 1e-4); argmax 50/50; token ids identical on the 5 checked pairs |
+| Qwen2.5-0.5B-Instruct (`crates/harpia-local/tests/parity_qwen.rs`, `HARPIA_QWEN_DIR`) | transformers 5.22.1, f32 | chat template string and token ids identical; max \|Δlogit\| 4.29e-4 over the top-50 logits of 33 positions (tolerance 1e-3); 20 greedy tokens identical to `generate()` with the model's `repetition_penalty` 1.1 |
+| LoRA export (Qwen2.5-0.5B, adapter trained by `harpia train sft`) | the PEFT merge formula `W += alpha/r · B·A` applied in transformers from `adapter_model.safetensors` | 12 greedy tokens identical to Harpia's merged model, max \|Δlogprob\| 3.1e-4 (PEFT itself was not installed, so the adapter was not loaded through `peft`) |
+| Classifier checkpoint written by `harpia train classifier` | loaded with `AutoModelForSequenceClassification` | probabilities identical to 6 decimals |
 
 The golden file stores line numbers and logits only; texts are read from `HARPIA_ERREI_DIR`.
 It was produced with this script, run once with errei's own virtual environment (kept here as

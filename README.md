@@ -160,10 +160,11 @@ See [`docs/models.md`](docs/models.md) for supported architectures, verification
 | `rapidfuzz` | `harpia-text::fuzzy` | available |
 | `langchain` text splitters | `harpia-data::chunk` | available |
 | `transformers` sequence classification, cross-encoders, `sentence-transformers` embeddings | `harpia-local` | available (XLM-R verified against transformers) |
-| `transformers` text generation + `outlines` constrained decoding | `harpia-local::TextGenerator` | available for Qwen2/Llama (not yet verified on a real checkpoint) |
+| `transformers` text generation + `outlines` constrained decoding | `harpia-local::TextGenerator` | available (Qwen2.5 verified against transformers; ~2.8× faster than `generate()` on CPU) |
 | `transformers` MarianMT | `harpia-local::MarianTranslator` | experimental |
 | `transformers` Trainer for sequence classification | `harpia-train::train_classifier` | available (about 1.7× slower than PyTorch on CPU, see benchmarks) |
-| `peft` LoRA SFT, `trl` DPO | `harpia-train::{train_lora_sft, train_lora_dpo}` | available (DPO experimental) |
+| `peft` LoRA SFT, `trl` DPO | `harpia-train::{train_lora_sft, train_lora_dpo}` | available (verified on Qwen2.5-0.5B; DPO experimental) |
+| `huggingface_hub` snapshot downloads | `harpia-local::hub`, `harpia download` | available |
 | `lm-eval-harness` / `ragas` | `harpia-eval` | planned |
 | `httpx` + sqlite cache, `tenacity` retries | `harpia-http` | available |
 | `openai`, `anthropic`, `ollama` clients (chat, streaming, tools, embeddings) | `harpia-client` | available |

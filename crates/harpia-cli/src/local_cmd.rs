@@ -177,12 +177,15 @@ pub struct GenerateArgs {
     /// Maximum new tokens.
     #[arg(long, default_value_t = 256)]
     pub max_tokens: u32,
-    /// Sampling temperature (0 = greedy).
-    #[arg(long, default_value_t = 0.0)]
-    pub temperature: f32,
-    /// Nucleus sampling.
-    #[arg(long, default_value_t = 1.0)]
-    pub top_p: f32,
+    /// Sampling temperature (0 = greedy; default: the model's generation_config.json).
+    #[arg(long)]
+    pub temperature: Option<f32>,
+    /// Nucleus sampling (default: generation_config.json).
+    #[arg(long)]
+    pub top_p: Option<f32>,
+    /// Repetition penalty over prompt and output (default: generation_config.json).
+    #[arg(long)]
+    pub repetition_penalty: Option<f32>,
     /// Seed.
     #[arg(long)]
     pub seed: Option<u64>,
@@ -190,11 +193,16 @@ pub struct GenerateArgs {
 
 pub fn generate(a: GenerateArgs, format: OutputFormat) -> Result<ExitCode> {
     let lm = TextGenerator::load(Path::new(&a.model))?;
+    let defaults = lm.default_params();
     let prompt = if a.prompt == "-" { read_text("-")? } else { a.prompt.clone() };
+    // unset sampling flags fall back to the model's generation_config.json, as in transformers
     let params = GenerationParams {
         max_new_tokens: a.max_tokens,
-        temperature: a.temperature,
-        top_p: a.top_p,
+        temperature: a.temperature.unwrap_or(defaults.temperature),
+        top_p: a.top_p.unwrap_or(defaults.top_p),
+        top_k: defaults.top_k,
+        min_p: defaults.min_p,
+        repetition_penalty: a.repetition_penalty.unwrap_or(defaults.repetition_penalty),
         seed: a.seed,
         ..Default::default()
     };
@@ -257,5 +265,38 @@ pub fn embed(a: EmbedArgs, format: OutputFormat) -> Result<ExitCode> {
             format!("embedded {} rows (dim {})", rows.len(), emb.dim())
         });
     }
+    Ok(ExitCode::SUCCESS)
+}
+
+#[derive(Args)]
+pub struct DownloadArgs {
+    /// Repository id, e.g. `Qwen/Qwen2.5-0.5B-Instruct`.
+    pub repo: String,
+    /// Revision (branch, tag or commit).
+    #[arg(long, default_value = "main")]
+    pub revision: String,
+    /// Cache directory (default: `$HARPIA_HOME/hub`, else `~/.cache/harpia/hub`).
+    #[arg(long)]
+    pub cache: Option<String>,
+    /// File patterns to fetch (comma-separated; default: configs, safetensors, tokenizers).
+    #[arg(long, value_delimiter = ',')]
+    pub include: Vec<String>,
+    /// Allow network access (required).
+    #[arg(long)]
+    pub online: bool,
+}
+
+pub fn download(a: DownloadArgs, format: OutputFormat) -> Result<ExitCode> {
+    let cache = a.cache.clone().map(std::path::PathBuf::from).unwrap_or_else(|| {
+        std::env::var_os("HARPIA_HOME")
+            .map(|h| std::path::PathBuf::from(h).join("hub"))
+            .or_else(|| std::env::var_os("HOME").map(|h| std::path::PathBuf::from(h).join(".cache/harpia/hub")))
+            .unwrap_or_else(|| "harpia-hub".into())
+    });
+    let policy = if a.online { harpia::core::NetworkPolicy::Online } else { harpia::core::NetworkPolicy::Offline };
+    let hub = harpia::local::hub::Hub::new(policy, &cache)?;
+    let pats: Vec<&str> = a.include.iter().map(String::as_str).collect();
+    let dir = hub.snapshot(&a.repo, &a.revision, if pats.is_empty() { None } else { Some(&pats) })?;
+    emit(format, json!({"path": dir}), || dir.display().to_string());
     Ok(ExitCode::SUCCESS)
 }

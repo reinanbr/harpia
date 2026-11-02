@@ -55,6 +55,7 @@ pub fn no_decay(name: &str) -> bool {
 /// generic candle optimizer allocates a full-size tensor per elementary op, which dominates the
 /// step time for large embedding matrices. Biases and norms get no weight decay.
 pub struct GroupedAdamW {
+    names: Vec<String>,
     params: Vec<(Var, bool, Vec<f32>, Vec<f32>)>,
     lr: f64,
     weight_decay: f64,
@@ -74,7 +75,46 @@ impl GroupedAdamW {
                 (v.clone(), !no_decay(n), vec![0f32; k], vec![0f32; k])
             })
             .collect();
-        Ok(Self { params, lr, weight_decay, beta1: 0.9, beta2: 0.999, eps: 1e-8, t: 0 })
+        Ok(Self {
+            names: vars.iter().map(|(n, _)| n.clone()).collect(),
+            params,
+            lr,
+            weight_decay,
+            beta1: 0.9,
+            beta2: 0.999,
+            eps: 1e-8,
+            t: 0,
+        })
+    }
+
+    /// Moments as named tensors (`<name>.exp_avg`, `<name>.exp_avg_sq`) and the step count.
+    pub fn state(&self) -> Result<(std::collections::HashMap<String, Tensor>, i32)> {
+        let mut out = std::collections::HashMap::new();
+        for (name, (var, _, m, v)) in self.names.iter().zip(&self.params) {
+            let shape = var.as_tensor().shape().clone();
+            let dev = var.as_tensor().device();
+            out.insert(format!("{name}.exp_avg"), Tensor::from_vec(m.clone(), shape.clone(), dev).map_err(err)?);
+            out.insert(format!("{name}.exp_avg_sq"), Tensor::from_vec(v.clone(), shape, dev).map_err(err)?);
+        }
+        Ok((out, self.t))
+    }
+
+    /// Restore [`state`](Self::state).
+    pub fn load_state(&mut self, state: &std::collections::HashMap<String, Tensor>, t: i32) -> Result<()> {
+        for (name, (_, _, m, v)) in self.names.iter().zip(self.params.iter_mut()) {
+            let get = |k: String| -> Result<Vec<f32>> {
+                state
+                    .get(&k)
+                    .ok_or_else(|| harpia_core::HarpiaError::invalid(format!("optimizer state lacks `{k}`")))?
+                    .flatten_all()
+                    .and_then(|t| t.to_vec1::<f32>())
+                    .map_err(err)
+            };
+            *m = get(format!("{name}.exp_avg"))?;
+            *v = get(format!("{name}.exp_avg_sq"))?;
+        }
+        self.t = t;
+        Ok(())
     }
 
     /// Set the learning rate.

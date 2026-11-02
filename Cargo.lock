@@ -1533,6 +1533,7 @@ dependencies = [
  "futures-core",
  "harpia-core",
  "harpia-data",
+ "harpia-http",
  "harpia-structured",
  "rayon",
  "serde",

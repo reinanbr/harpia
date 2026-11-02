@@ -82,6 +82,15 @@ pub struct ClassifierArgs {
     /// Do not weight the loss by inverse class frequency.
     #[arg(long)]
     pub no_class_weights: bool,
+    /// Dropout probability (default: the model's config.json values; 0 disables).
+    #[arg(long)]
+    pub dropout: Option<f64>,
+    /// Continue from `<out>/checkpoint/`.
+    #[arg(long)]
+    pub resume: bool,
+    /// Stop after this epoch (continue later with --resume).
+    #[arg(long)]
+    pub stop_after: Option<usize>,
 }
 
 fn examples(path: &str, a: &ClassifierArgs) -> Result<Vec<Example>> {
@@ -132,6 +141,9 @@ fn classifier(a: ClassifierArgs, format: OutputFormat) -> Result<ExitCode> {
         max_len: a.max_len,
         seed: a.seed,
         class_weights: !a.no_class_weights,
+        dropout: a.dropout,
+        resume: a.resume,
+        stop_after: a.stop_after,
         ..Default::default()
     };
     let every = (train.len().div_ceil(a.batch_size.max(1)) / 10).max(1);
@@ -187,6 +199,9 @@ pub struct LoraArgs {
     /// LoRA alpha.
     #[arg(long, default_value_t = 32.0)]
     pub alpha: f64,
+    /// LoRA dropout.
+    #[arg(long, default_value_t = 0.0)]
+    pub lora_dropout: f64,
     /// Epochs.
     #[arg(long, default_value_t = 1)]
     pub epochs: usize,
@@ -205,18 +220,26 @@ pub struct LoraArgs {
     /// Also write merged full weights.
     #[arg(long)]
     pub merge: bool,
+    /// Continue from `<out>/checkpoint/`.
+    #[arg(long)]
+    pub resume: bool,
+    /// Stop after this epoch (continue later with --resume).
+    #[arg(long)]
+    pub stop_after: Option<usize>,
 }
 
 impl LoraArgs {
     fn config(&self, default_lr: f64) -> LoraTrainConfig {
         LoraTrainConfig {
-            lora: LoraConfig { r: self.r, alpha: self.alpha, ..Default::default() },
+            lora: LoraConfig { r: self.r, alpha: self.alpha, dropout: self.lora_dropout, ..Default::default() },
             epochs: self.epochs,
             lr: self.lr.unwrap_or(default_lr),
             grad_accum: self.grad_accum,
             max_len: self.max_len,
             seed: self.seed,
             save_merged: self.merge,
+            resume: self.resume,
+            stop_after: self.stop_after,
             ..Default::default()
         }
     }

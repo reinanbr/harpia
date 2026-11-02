@@ -20,6 +20,8 @@ pub mod adapter;
 mod cache;
 pub mod decoder;
 mod encoder;
+#[cfg(feature = "hub")]
+pub mod hub;
 mod loader;
 mod marian;
 pub mod sampling;

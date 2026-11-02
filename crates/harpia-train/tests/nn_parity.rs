@@ -82,3 +82,21 @@ fn llama_training_forward_matches_inference() {
     testing::llama(dir.path()).unwrap();
     check_decoder(dir.path());
 }
+
+#[test]
+fn dropout_is_seeded_and_off_in_eval() {
+    let dir = tempfile::tempdir().unwrap();
+    testing::xlm_roberta_classifier(dir.path(), &["a", "b"]).unwrap();
+    let md = ModelDir::open(dir.path()).unwrap();
+    let store = TrainStore::new(md.tensors(&Device::Cpu).unwrap(), Mode::Frozen, &Device::Cpu, 0).unwrap();
+    let ids = vec![vec![0u32, 8, 9, 10, 2]];
+    let run = |seed: u64, train: bool| {
+        let net = EncoderClassifier::new(&md.config, &store, 2).unwrap().with_dropout(0.5, 0.5, 0.5, seed);
+        net.set_training(train);
+        net.logits(&ids, &Device::Cpu).unwrap().to_vec2::<f32>().unwrap()
+    };
+    assert_eq!(run(1, false), run(2, false), "eval ignores dropout");
+    assert_eq!(run(7, true), run(7, true), "same seed, same masks");
+    assert_ne!(run(7, true), run(8, true));
+    assert_ne!(run(7, true), run(7, false));
+}

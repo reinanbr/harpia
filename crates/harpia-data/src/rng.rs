@@ -15,6 +15,16 @@ impl SplitMix64 {
         Self { state: seed }
     }
 
+    /// Internal state (to checkpoint and resume a run exactly).
+    pub fn state(&self) -> u64 {
+        self.state
+    }
+
+    /// Generator continuing from a saved [`state`](Self::state).
+    pub fn from_state(state: u64) -> Self {
+        Self { state }
+    }
+
     /// Next 64 random bits.
     pub fn next_u64(&mut self) -> u64 {
         self.state = self.state.wrapping_add(0x9E37_79B9_7F4A_7C15);

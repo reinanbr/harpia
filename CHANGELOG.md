@@ -6,6 +6,22 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added (pending-items pass)
+
+- `harpia-http::HttpClient::download_to_file` (streaming, atomic, capped); `harpia-local` feature
+  `hub` (`Hub::snapshot`) and `harpia download <repo> --online`.
+- Parity with transformers on a real decoder (Qwen2.5-0.5B-Instruct): template, tokens, logits,
+  greedy decoding. LoRA export cross-checked against the PEFT merge formula.
+- `TextGenerator::default_params` from `generation_config.json`; the CLI uses it for unset flags.
+- Training dropout (from `config.json`, seeded) and LoRA dropout; per-epoch resumable checkpoints
+  (`resume`, `stop_after`) that reproduce uninterrupted runs bit for bit.
+- `cargo deny` and `cargo hack` run clean locally (44 feature combinations).
+
+### Fixed
+
+- Repetition penalty now covers prompt tokens, as in transformers.
+- Training histories round-trip exactly through JSON (`serde_json/float_roundtrip`).
+
 ### Added
 
 - `harpia-http`: offline-by-default polite client (async + blocking): per-host intervals,

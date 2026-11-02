@@ -34,6 +34,8 @@ client = ["http", "data", "structured", "dep:harpia-client", "harpia-client?/ope
 tls = ["http", "harpia-http?/tls", "harpia-client?/tls"]
 ## Local inference with candle (encoders, MarianMT, Qwen2/Llama decoders). Pure Rust on CPU.
 local = ["data", "structured", "tokenizers", "dep:harpia-local"]
+## Hugging Face Hub downloads for local models (add `tls` for https).
+hub = ["local", "http", "harpia-local?/hub"]
 ## NVIDIA GPU inference (native code: CUDA).
 cuda = ["local", "harpia-local?/cuda"]
 ## Apple GPU inference (native code: Metal).
@@ -41,7 +43,7 @@ metal = ["local", "harpia-local?/metal"]
 ## Fine-tuning (classifiers, LoRA SFT, DPO). Pure Rust on CPU.
 train = ["local", "dep:harpia-train"]
 ## Everything implemented so far, in pure Rust (add `tls` for HTTPS).
-full = ["text", "data", "structured", "langid", "tokenizers", "schema", "http", "client", "local", "train"]
+full = ["text", "data", "structured", "langid", "tokenizers", "schema", "http", "client", "local", "hub", "train"]
 
 [dependencies]
 harpia-core = { workspace = true }

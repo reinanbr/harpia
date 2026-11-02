@@ -18,6 +18,7 @@
 #![warn(missing_docs)]
 
 pub mod backend;
+pub mod checkpoint;
 mod classifier;
 mod lora;
 pub mod nn;

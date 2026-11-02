@@ -501,6 +501,49 @@ impl HttpClient {
         }
         Ok(data)
     }
+
+    /// Stream `req` to `path` (atomically: written to `path.part`, then renamed) with a byte limit.
+    /// An existing `path` is kept and its size returned without any request. Returns the size.
+    pub async fn download_to_file(&self, req: Request, path: &std::path::Path, max_bytes: u64) -> Result<u64> {
+        use std::io::Write;
+        if let Ok(meta) = std::fs::metadata(path) {
+            return Ok(meta.len());
+        }
+        let url = self.full_url(&req)?;
+        let host = self.check(&url)?;
+        let resp = self.send_with_retries(&req, &url, &host).await?;
+        if !resp.status().is_success() {
+            return Err(HarpiaError::Remote { host, message: format!("HTTP {}", resp.status().as_u16()) });
+        }
+        if resp.content_length().is_some_and(|n| n > max_bytes) {
+            return Err(HarpiaError::Remote { host, message: format!("file larger than {max_bytes} bytes") });
+        }
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent).map_err(|e| HarpiaError::io(parent, e))?;
+        }
+        let part = path.with_extension(format!(
+            "{}part",
+            path.extension().map(|e| format!("{}.", e.to_string_lossy())).unwrap_or_default()
+        ));
+        let mut file = std::io::BufWriter::new(std::fs::File::create(&part).map_err(|e| HarpiaError::io(&part, e))?);
+        let mut total = 0u64;
+        let mut stream = resp.bytes_stream();
+        while let Some(chunk) = stream.next().await {
+            let chunk =
+                chunk.map_err(|e| HarpiaError::Remote { host: host.clone(), message: e.without_url().to_string() })?;
+            total += chunk.len() as u64;
+            if total > max_bytes {
+                drop(file);
+                let _ = std::fs::remove_file(&part);
+                return Err(HarpiaError::Remote { host, message: format!("file larger than {max_bytes} bytes") });
+            }
+            file.write_all(&chunk).map_err(|e| HarpiaError::io(&part, e))?;
+        }
+        file.flush().map_err(|e| HarpiaError::io(&part, e))?;
+        drop(file);
+        std::fs::rename(&part, path).map_err(|e| HarpiaError::io(path, e))?;
+        Ok(total)
+    }
 }
 
 async fn read_capped(resp: reqwest::Response, max: usize, host: &str) -> Result<Vec<u8>> {

@@ -131,3 +131,33 @@ fn retry_after_forms() {
     assert_eq!(parse_retry_after("Wed, 21 Oct 2015 07:28:00 GMT"), Some(Duration::ZERO));
     assert_eq!(parse_retry_after("soon"), None);
 }
+
+#[tokio::test]
+async fn download_to_file_is_atomic_and_capped() {
+    let server = MockServer::start().await;
+    Mock::given(path("/w.bin"))
+        .respond_with(ResponseTemplate::new(200).set_body_bytes(vec![7u8; 5000]))
+        .expect(1)
+        .mount(&server)
+        .await;
+    let client = HttpClient::new(online()).unwrap();
+    let dir = tempfile::tempdir().unwrap();
+    let dest = dir.path().join("sub/w.bin");
+    let url = format!("{}/w.bin", server.uri());
+    assert!(client.download_to_file(Request::get(&url), &dir.path().join("small.bin"), 100).await.is_err());
+    assert!(!dir.path().join("small.bin").exists() && !dir.path().join("small.bin.part").exists());
+    let server2 = MockServer::start().await;
+    Mock::given(path("/w.bin"))
+        .respond_with(ResponseTemplate::new(200).set_body_bytes(vec![7u8; 5000]))
+        .expect(1)
+        .mount(&server2)
+        .await;
+    let url2 = format!("{}/w.bin", server2.uri());
+    assert_eq!(client.download_to_file(Request::get(&url2), &dest, 10_000).await.unwrap(), 5000);
+    assert_eq!(
+        client.download_to_file(Request::get(&url2), &dest, 10_000).await.unwrap(),
+        5000,
+        "existing file kept, no request"
+    );
+    assert_eq!(std::fs::read(&dest).unwrap().len(), 5000);
+}

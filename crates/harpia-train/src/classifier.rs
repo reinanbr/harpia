@@ -53,8 +53,17 @@ pub struct ClassifierConfig {
     pub grad_clip: f64,
     /// Weight the loss by inverse class frequency (`n / (k · count)`).
     pub class_weights: bool,
-    /// Shuffling seed.
+    /// Shuffling and dropout seed.
     pub seed: u64,
+    /// Dropout probability for hidden states, attention and the head; `None` uses the model's
+    /// `config.json` values (`hidden_dropout_prob`, `attention_probs_dropout_prob`,
+    /// `classifier_dropout`), as transformers does. `Some(0.0)` disables dropout.
+    pub dropout: Option<f64>,
+    /// Continue from `<out>/checkpoint/` (weights, optimizer moments, RNG, history) when present.
+    pub resume: bool,
+    /// Stop after this epoch (time-boxed runs); continue later with `resume`. The learning-rate
+    /// schedule still spans `epochs`.
+    pub stop_after: Option<usize>,
 }
 
 impl Default for ClassifierConfig {
@@ -72,6 +81,9 @@ impl Default for ClassifierConfig {
             grad_clip: 1.0,
             class_weights: true,
             seed: 42,
+            dropout: None,
+            resume: false,
+            stop_after: None,
         }
     }
 }
@@ -194,7 +206,10 @@ pub fn train_classifier(
     };
 
     let store = TrainStore::new(tensors, Mode::Full, &device, cfg.seed).map_err(err)?;
-    let net = EncoderClassifier::new(&md.config, &store, cfg.labels.len()).map_err(err)?;
+    let mut net = EncoderClassifier::new(&md.config, &store, cfg.labels.len()).map_err(err)?;
+    if let Some(p) = cfg.dropout {
+        net = net.with_dropout(p, p, p, cfg.seed);
+    }
     let vars: Vec<(String, candle_core::Var)> = store.trainable();
     let tok = truncating_tokenizer(&md, cfg.max_len)?;
     let encode = |e: &Example| -> Result<Vec<u32>> {
@@ -226,7 +241,19 @@ pub fn train_classifier(
     let mut rng = SplitMix64::new(cfg.seed);
     let mut step = 0;
     let mut best = -1.0f64;
-    let mut history = Vec::new();
+    let mut history: Vec<EpochReport> = Vec::new();
+    let mut first_epoch = 1;
+    let ckpt = crate::checkpoint::checkpoint_dir(out);
+    if cfg.resume
+        && let Some(state) = crate::checkpoint::load(&ckpt, &vars, &mut opt)?
+    {
+        first_epoch = state["epoch"].as_u64().unwrap_or(0) as usize + 1;
+        step = state["step"].as_u64().unwrap_or(0) as usize;
+        best = state["best"].as_f64().unwrap_or(-1.0);
+        rng = SplitMix64::from_state(state["rng"].as_u64().unwrap_or(cfg.seed));
+        history = serde_json::from_value(state["history"].clone())?;
+        tracing::info!(first_epoch, step, "resumed from checkpoint");
+    }
 
     let evaluate = |net: &EncoderClassifier| -> Result<Vec<u32>> {
         let mut pred = Vec::with_capacity(val_ids.len());
@@ -243,10 +270,12 @@ pub fn train_classifier(
         Ok(pred)
     };
 
-    for epoch in 1..=cfg.epochs {
+    for epoch in first_epoch..=cfg.epochs {
         let mut order: Vec<usize> = (0..train_ids.len()).collect();
         rng.shuffle(&mut order);
         let mut loss_sum = 0.0;
+        net.reseed_dropout(cfg.seed.wrapping_add(epoch as u64));
+        net.set_training(true);
         for chunk in order.chunks(cfg.batch_size.max(1)) {
             let batch: Vec<Vec<u32>> = chunk.iter().map(|&i| train_ids[i].clone()).collect();
             let ys: Vec<u32> = chunk.iter().map(|&i| train_y[i]).collect();
@@ -279,6 +308,7 @@ pub fn train_classifier(
                 elapsed: t0.elapsed().as_secs_f64(),
             });
         }
+        net.set_training(false);
         let pred = evaluate(&net)?;
         let (f1, per) = macro_f1(&val_y, &pred, k);
         history.push(EpochReport {
@@ -291,6 +321,12 @@ pub fn train_classifier(
         if f1 > best {
             best = f1;
             save_checkpoint(&md, &store, out, &cfg.labels)?;
+        }
+        let state =
+            serde_json::json!({"epoch": epoch, "step": step, "best": best, "rng": rng.state(), "history": history});
+        crate::checkpoint::save(&ckpt, &vars, &opt, &state)?;
+        if cfg.stop_after == Some(epoch) {
+            break;
         }
     }
     let report = TrainReport {

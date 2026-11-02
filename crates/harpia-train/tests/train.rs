@@ -157,3 +157,55 @@ fn lora_dpo_prefers_chosen() {
     let after = margin(&TextGenerator::load_with_adapter(&base, Some(&out), &Device::Cpu, DType::F32).unwrap());
     assert!(after > before, "margin {before} -> {after}");
 }
+
+#[test]
+fn resuming_reproduces_an_uninterrupted_run() {
+    let dir = tempfile::tempdir().unwrap();
+    let base = dir.path().join("base");
+    testing::xlm_roberta_classifier(&base, &["entailment", "neutral", "contradiction"]).unwrap();
+    let cfg = |stop_after: Option<usize>, resume: bool| ClassifierConfig {
+        labels: vec!["sustenta".into(), "neutro".into(), "contradiz".into()],
+        epochs: 4,
+        stop_after,
+        batch_size: 4,
+        lr: 3e-3,
+        dropout: Some(0.2),
+        resume,
+        ..Default::default()
+    };
+    let (train, val) = (toy_examples(12), toy_examples(6));
+    let a = dir.path().join("straight");
+    let ra = train_classifier(&base, &a, &cfg(None, false), &train, &val, |_| {}).unwrap();
+    let b = dir.path().join("resumed");
+    train_classifier(&base, &b, &cfg(Some(2), false), &train, &val, |_| {}).unwrap();
+    let rb = train_classifier(&base, &b, &cfg(None, true), &train, &val, |_| {}).unwrap();
+    assert_eq!(ra.history, rb.history);
+    let wa = candle_core::safetensors::load(a.join("checkpoint/trainable.safetensors"), &Device::Cpu).unwrap();
+    let wb = candle_core::safetensors::load(b.join("checkpoint/trainable.safetensors"), &Device::Cpu).unwrap();
+    for (k, t) in &wa {
+        let d = (t - &wb[k]).unwrap().abs().unwrap().max_all().unwrap().to_scalar::<f32>().unwrap();
+        assert!(d == 0.0, "{k} differs by {d}");
+    }
+}
+
+#[test]
+fn lora_resume_is_exact() {
+    let dir = tempfile::tempdir().unwrap();
+    let base = dir.path().join("base");
+    testing::qwen2(&base).unwrap();
+    let lm = TextGenerator::load(&base).unwrap();
+    let samples = vec![sft_sample(&lm), sft_sample(&lm)];
+    let cfg = |stop_after: Option<usize>, resume: bool| LoraTrainConfig {
+        lora: LoraConfig { r: 4, alpha: 8.0, dropout: 0.1, ..Default::default() },
+        epochs: 4,
+        lr: 1e-2,
+        stop_after,
+        resume,
+        ..Default::default()
+    };
+    let a = train_lora_sft(&base, &dir.path().join("a"), &cfg(None, false), &samples, |_, _, _| {}).unwrap();
+    let out_b = dir.path().join("b");
+    train_lora_sft(&base, &out_b, &cfg(Some(2), false), &samples, |_, _, _| {}).unwrap();
+    let b = train_lora_sft(&base, &out_b, &cfg(None, true), &samples, |_, _, _| {}).unwrap();
+    assert_eq!(a.losses, b.losses);
+}

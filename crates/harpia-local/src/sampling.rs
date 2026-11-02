@@ -12,11 +12,19 @@ pub fn log_softmax(logits: &[f32]) -> Vec<f32> {
     logits.iter().map(|x| x - lse).collect()
 }
 
-/// Apply repetition (multiplicative, HF convention), frequency and presence penalties for the
-/// tokens generated so far.
-pub fn apply_penalties(logits: &mut [f32], generated: &[u32], p: &GenerationParams) {
-    if generated.is_empty() || (p.repetition_penalty == 1.0 && p.frequency_penalty == 0.0 && p.presence_penalty == 0.0)
-    {
+/// Apply penalties. The repetition penalty (multiplicative) follows Hugging Face and covers every
+/// token in `context` (prompt and generated); frequency and presence penalties (additive) follow
+/// the OpenAI convention and cover only `generated`.
+pub fn apply_penalties(logits: &mut [f32], context: &[u32], generated: &[u32], p: &GenerationParams) {
+    if p.repetition_penalty != 1.0 {
+        let seen: std::collections::HashSet<u32> = context.iter().copied().collect();
+        for t in seen {
+            if let Some(l) = logits.get_mut(t as usize) {
+                *l = if *l > 0.0 { *l / p.repetition_penalty } else { *l * p.repetition_penalty };
+            }
+        }
+    }
+    if p.frequency_penalty == 0.0 && p.presence_penalty == 0.0 {
         return;
     }
     let mut counts: HashMap<u32, f32> = HashMap::new();
@@ -24,11 +32,9 @@ pub fn apply_penalties(logits: &mut [f32], generated: &[u32], p: &GenerationPara
         *counts.entry(t).or_default() += 1.0;
     }
     for (&t, &c) in &counts {
-        let Some(l) = logits.get_mut(t as usize) else { continue };
-        if p.repetition_penalty != 1.0 {
-            *l = if *l > 0.0 { *l / p.repetition_penalty } else { *l * p.repetition_penalty };
+        if let Some(l) = logits.get_mut(t as usize) {
+            *l -= p.frequency_penalty * c + p.presence_penalty;
         }
-        *l -= p.frequency_penalty * c + p.presence_penalty;
     }
 }
 
@@ -132,10 +138,12 @@ mod tests {
         let mut l = vec![2.0, -1.0, 0.5];
         apply_penalties(
             &mut l,
+            &[2, 0, 1, 1],
             &[0, 1, 1],
             &GenerationParams { repetition_penalty: 2.0, frequency_penalty: 0.1, ..Default::default() },
         );
         assert!((l[0] - (1.0 - 0.1)).abs() < 1e-6);
+        assert!((l[2] - 0.25).abs() < 1e-6, "prompt tokens get the repetition penalty");
         assert!((l[1] - (-2.0 - 0.2)).abs() < 1e-6);
         let ls = log_softmax(&[1.0, 1.0]);
         assert!((ls[0] - 0.5f32.ln()).abs() < 1e-6);

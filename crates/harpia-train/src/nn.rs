@@ -26,6 +26,11 @@ impl Lin {
     }
 
     fn forward(&self, x: &Tensor) -> Result<Tensor> {
+        self.forward_d(x, None)
+    }
+
+    /// Forward with optional LoRA dropout on the adapter input (PEFT: `B(A(dropout(x)))`).
+    fn forward_d(&self, x: &Tensor, lora_drop: Option<&Dropout>) -> Result<Tensor> {
         // flatten leading dims: one 2-D GEMM is much faster than a batched broadcast matmul
         let dims = x.dims().to_vec();
         let inp = *dims.last().expect("rank >= 1");
@@ -35,11 +40,57 @@ impl Lin {
             y = y.broadcast_add(b)?;
         }
         if let Some((a, b, s)) = &self.lora {
-            y = (y + (x2.matmul(&a.t()?)?.matmul(&b.t()?)? * *s)?)?;
+            let xin = match lora_drop {
+                Some(d) => d.apply(&x2)?,
+                None => x2.clone(),
+            };
+            y = (y + (xin.matmul(&a.t()?)?.matmul(&b.t()?)? * *s)?)?;
         }
         let mut out = dims;
         *out.last_mut().expect("rank >= 1") = y.dim(1)?;
         y.reshape(out)
+    }
+}
+
+/// Inverted dropout with a seeded generator; a no-op when `p == 0` or training is off.
+pub struct Dropout {
+    p: f64,
+    on: std::sync::atomic::AtomicBool,
+    rng: std::sync::Mutex<harpia_data::rng::SplitMix64>,
+}
+
+impl Dropout {
+    /// Dropout with probability `p`, off until [`Dropout::set_training`] turns it on.
+    pub fn new(p: f64, seed: u64) -> Self {
+        Self {
+            p,
+            on: std::sync::atomic::AtomicBool::new(false),
+            rng: std::sync::Mutex::new(harpia_data::rng::SplitMix64::new(seed)),
+        }
+    }
+
+    /// Restart the generator from `seed`.
+    pub fn reseed(&self, seed: u64) {
+        *self.rng.lock().expect("dropout rng") = harpia_data::rng::SplitMix64::new(seed);
+    }
+
+    /// Enable (training) or disable (evaluation).
+    pub fn set_training(&self, on: bool) {
+        self.on.store(on, std::sync::atomic::Ordering::Relaxed);
+    }
+
+    /// Apply to `x`.
+    pub fn apply(&self, x: &Tensor) -> Result<Tensor> {
+        if self.p <= 0.0 || !self.on.load(std::sync::atomic::Ordering::Relaxed) {
+            return Ok(x.clone());
+        }
+        let keep = 1.0 - self.p;
+        let n = x.elem_count();
+        let mask: Vec<f32> = {
+            let mut r = self.rng.lock().expect("dropout rng");
+            (0..n).map(|_| if r.next_f64() < keep { (1.0 / keep) as f32 } else { 0.0 }).collect()
+        };
+        x.mul(&Tensor::from_vec(mask, x.shape(), x.device())?.to_dtype(x.dtype())?)
     }
 }
 
@@ -106,6 +157,9 @@ pub struct EncoderClassifier {
     eps: f64,
     act: String,
     pad: u32,
+    hidden_drop: Dropout,
+    attn_drop: Dropout,
+    cls_drop: Dropout,
 }
 
 impl EncoderClassifier {
@@ -163,7 +217,35 @@ impl EncoderClassifier {
             eps: cfg["layer_norm_eps"].as_f64().unwrap_or(1e-12),
             act: cfg["hidden_act"].as_str().unwrap_or("gelu").to_string(),
             pad: cfg["pad_token_id"].as_u64().unwrap_or(if roberta { 1 } else { 0 }) as u32,
+            hidden_drop: Dropout::new(cfg["hidden_dropout_prob"].as_f64().unwrap_or(0.1), 1),
+            attn_drop: Dropout::new(cfg["attention_probs_dropout_prob"].as_f64().unwrap_or(0.1), 2),
+            cls_drop: Dropout::new(
+                cfg["classifier_dropout"].as_f64().or(cfg["hidden_dropout_prob"].as_f64()).unwrap_or(0.1),
+                3,
+            ),
         })
+    }
+
+    /// Override the dropout probabilities (`hidden`, `attention`, `classifier`) and seed.
+    pub fn with_dropout(mut self, hidden: f64, attention: f64, classifier: f64, seed: u64) -> Self {
+        self.hidden_drop = Dropout::new(hidden, seed);
+        self.attn_drop = Dropout::new(attention, seed.wrapping_add(1));
+        self.cls_drop = Dropout::new(classifier, seed.wrapping_add(2));
+        self
+    }
+
+    /// Re-seed every dropout generator (called per epoch so a resumed run draws the same masks).
+    pub fn reseed_dropout(&self, seed: u64) {
+        for (i, d) in [&self.hidden_drop, &self.attn_drop, &self.cls_drop].into_iter().enumerate() {
+            d.reseed(seed.wrapping_mul(31).wrapping_add(i as u64));
+        }
+    }
+
+    /// Turn dropout on (training) or off (evaluation, the default).
+    pub fn set_training(&self, on: bool) {
+        for d in [&self.hidden_drop, &self.attn_drop, &self.cls_drop] {
+            d.set_training(on);
+        }
     }
 
     /// Logits `(batch, labels)` for encoded inputs (padded internally).
@@ -188,7 +270,7 @@ impl EncoderClassifier {
         let tidx = Tensor::zeros(b * s, DType::U32, device)?;
         let x = (self.word.index_select(&idx, 0)? + self.pos.index_select(&pidx, 0)?)?;
         let x = (x + self.types.index_select(&tidx, 0)?)?.reshape((b, s, h))?;
-        let mut x = layer_norm(&x, &self.emb_ln.0, &self.emb_ln.1, self.eps)?;
+        let mut x = self.hidden_drop.apply(&layer_norm(&x, &self.emb_ln.0, &self.emb_ln.1, self.eps)?)?;
         let mask = Tensor::from_vec(mask, (b, 1, 1, s), device)?;
         let hd = h / self.heads;
         let split = |t: Tensor| -> Result<Tensor> { t.reshape((b, s, self.heads, hd))?.transpose(1, 2)?.contiguous() };
@@ -197,15 +279,22 @@ impl EncoderClassifier {
             let k = split(l.k.forward(&x)?)?;
             let v = split(l.v.forward(&x)?)?;
             let scores = (q.matmul(&k.t()?)? / (hd as f64).sqrt())?.broadcast_add(&mask)?;
-            let ctx = softmax(&scores)?.matmul(&v)?.transpose(1, 2)?.contiguous()?.reshape((b, s, h))?;
-            x = layer_norm(&(l.attn_out.forward(&ctx)? + &x)?, &l.attn_ln.0, &l.attn_ln.1, self.eps)?;
-            let ff = l.out.forward(&act(&self.act, &l.inter.forward(&x)?)?)?;
+            let probs = self.attn_drop.apply(&softmax(&scores)?)?;
+            let ctx = probs.matmul(&v)?.transpose(1, 2)?.contiguous()?.reshape((b, s, h))?;
+            let attn = self.hidden_drop.apply(&l.attn_out.forward(&ctx)?)?;
+            x = layer_norm(&(attn + &x)?, &l.attn_ln.0, &l.attn_ln.1, self.eps)?;
+            let ff = self.hidden_drop.apply(&l.out.forward(&act(&self.act, &l.inter.forward(&x)?)?)?)?;
             x = layer_norm(&(ff + &x)?, &l.out_ln.0, &l.out_ln.1, self.eps)?;
         }
         let cls = x.narrow(1, 0, 1)?.squeeze(1)?;
         match &self.head {
-            Head::Roberta { dense, out_proj } => out_proj.forward(&dense.forward(&cls)?.tanh()?),
-            Head::Bert { pooler, classifier } => classifier.forward(&pooler.forward(&cls)?.tanh()?),
+            Head::Roberta { dense, out_proj } => {
+                let h = dense.forward(&self.cls_drop.apply(&cls)?)?.tanh()?;
+                out_proj.forward(&self.cls_drop.apply(&h)?)
+            }
+            Head::Bert { pooler, classifier } => {
+                classifier.forward(&self.cls_drop.apply(&pooler.forward(&cls)?.tanh()?)?)
+            }
         }
     }
 }
@@ -236,6 +325,7 @@ pub struct DecoderLm {
     eps: f64,
     act: String,
     inv_freq: Vec<f32>,
+    lora_drop: Dropout,
 }
 
 fn inv_freq(cfg: &Value, head_dim: usize) -> Vec<f32> {
@@ -309,7 +399,24 @@ impl DecoderLm {
             eps: cfg["rms_norm_eps"].as_f64().unwrap_or(1e-6),
             act: cfg["hidden_act"].as_str().unwrap_or("silu").to_string(),
             inv_freq: inv_freq(cfg, head_dim),
+            lora_drop: Dropout::new(0.0, 0),
         })
+    }
+
+    /// LoRA dropout probability and seed (PEFT `lora_dropout`).
+    pub fn with_lora_dropout(mut self, p: f64, seed: u64) -> Self {
+        self.lora_drop = Dropout::new(p, seed);
+        self
+    }
+
+    /// Re-seed the LoRA dropout generator.
+    pub fn reseed_dropout(&self, seed: u64) {
+        self.lora_drop.reseed(seed);
+    }
+
+    /// Turn LoRA dropout on (training) or off (evaluation, the default).
+    pub fn set_training(&self, on: bool) {
+        self.lora_drop.set_training(on);
     }
 
     fn rope(&self, x: &Tensor, cos: &Tensor, sin: &Tensor) -> Result<Tensor> {
@@ -335,9 +442,21 @@ impl DecoderLm {
         let rep = self.heads / self.kv_heads;
         for l in &self.layers {
             let hn = rms_norm(&x, &l.in_ln, self.eps)?;
-            let q = l.q.forward(&hn)?.reshape((1, s, self.heads, self.head_dim))?.transpose(1, 2)?.contiguous()?;
-            let k = l.k.forward(&hn)?.reshape((1, s, self.kv_heads, self.head_dim))?.transpose(1, 2)?.contiguous()?;
-            let v = l.v.forward(&hn)?.reshape((1, s, self.kv_heads, self.head_dim))?.transpose(1, 2)?.contiguous()?;
+            let q =
+                l.q.forward_d(&hn, Some(&self.lora_drop))?
+                    .reshape((1, s, self.heads, self.head_dim))?
+                    .transpose(1, 2)?
+                    .contiguous()?;
+            let k =
+                l.k.forward_d(&hn, Some(&self.lora_drop))?
+                    .reshape((1, s, self.kv_heads, self.head_dim))?
+                    .transpose(1, 2)?
+                    .contiguous()?;
+            let v =
+                l.v.forward_d(&hn, Some(&self.lora_drop))?
+                    .reshape((1, s, self.kv_heads, self.head_dim))?
+                    .transpose(1, 2)?
+                    .contiguous()?;
             let q = self.rope(&q, &cos, &sin)?;
             let k = self.rope(&k, &cos, &sin)?;
             let expand = |t: Tensor| -> Result<Tensor> {
@@ -358,9 +477,10 @@ impl DecoderLm {
                 s,
                 self.heads * self.head_dim,
             ))?;
-            x = (x + l.o.forward(&ctx)?)?;
+            x = (x + l.o.forward_d(&ctx, Some(&self.lora_drop))?)?;
             let hn = rms_norm(&x, &l.post_ln, self.eps)?;
-            let ff = l.down.forward(&(act(&self.act, &l.gate.forward(&hn)?)? * l.up.forward(&hn)?)?)?;
+            let d = Some(&self.lora_drop);
+            let ff = l.down.forward_d(&(act(&self.act, &l.gate.forward_d(&hn, d)?)? * l.up.forward_d(&hn, d)?)?, d)?;
             x = (x + ff)?;
         }
         self.lm_head.forward(&rms_norm(&x, &self.norm, self.eps)?)?.squeeze(0)

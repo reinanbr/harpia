@@ -5,6 +5,11 @@ all-features = true
 
 [advisories]
 yanked = "deny"
+ignore = [
+    # `paste` is unmaintained (not vulnerable); it is a build-time proc-macro of candle's `gemm`.
+    # Revisit when candle drops it.
+    { id = "RUSTSEC-2024-0436", reason = "unmaintained proc-macro pulled by candle/gemm; no vulnerability" },
+]
 
 [licenses]
 confidence-threshold = 0.9
@@ -21,6 +26,10 @@ allow = [
     "MPL-2.0",
     "CC0-1.0",
     "BSL-1.0",
+    # permissive: fluent-uri (via jsonschema)
+    "MIT-0",
+    # permissive data license of the Mozilla CA bundle (webpki roots, `tls` feature only)
+    "CDLA-Permissive-2.0",
 ]
 
 [bans]

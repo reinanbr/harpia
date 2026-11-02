@@ -50,6 +50,11 @@ impl HttpClient {
         self.rt.block_on(self.inner.get_json(req))
     }
 
+    /// See [`AsyncClient::download_to_file`].
+    pub fn download_to_file(&self, req: Request, path: &std::path::Path, max_bytes: u64) -> Result<u64> {
+        self.rt.block_on(self.inner.download_to_file(req, path, max_bytes))
+    }
+
     /// See [`AsyncClient::download`].
     pub fn download(&self, url: &str, max_bytes: usize) -> Result<Vec<u8>> {
         self.rt.block_on(self.inner.download(url, max_bytes))
