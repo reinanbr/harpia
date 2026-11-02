@@ -54,6 +54,9 @@ fn classifier_fine_tuning_with_head_remap() {
         report.history.iter().map(|h| h.val_macro_f1).collect::<Vec<_>>()
     );
     assert!(out.join("train.json").exists() && out.join("tokenizer.json").exists());
+    let card = std::fs::read_to_string(out.join("README.md")).unwrap();
+    assert!(card.contains("## Evaluation") && card.contains("val_macro_f1"), "{card}");
+    assert!(card.contains("| validation data | validation |"));
 
     // the checkpoint reloads with the new labels and reproduces the best validation score
     let clf = SequenceClassifier::load_with(&out, &Device::Cpu, DType::F32, 192).unwrap();
@@ -105,6 +108,9 @@ fn check_lora_sft(base: &std::path::Path, steps: usize) {
     assert!(report.adapted_weights >= 2 * 7, "every layer's projections are adapted");
     assert!(report.losses.last().unwrap() < report.losses.first().unwrap(), "{:?}", report.losses);
     assert!(out.join("adapter_config.json").exists() && out.join("adapter_model.safetensors").exists());
+    let card = std::fs::read_to_string(out.join("README.md")).unwrap();
+    assert!(card.contains("LoRA adapter") && card.contains(&report.data_hash), "{card}");
+    assert_eq!(report.data_hash.len(), 32);
 
     let adapted = TextGenerator::load_with_adapter(base, Some(&out), &Device::Cpu, DType::F32).unwrap();
     let merged = TextGenerator::load(&out.join("merged")).unwrap();

@@ -124,6 +124,12 @@ pub struct LoraReport {
     pub seconds: f64,
     /// Harpia version.
     pub harpia_version: String,
+    /// Content hash of the training data.
+    #[serde(default)]
+    pub data_hash: String,
+    /// Where the run executed.
+    #[serde(default)]
+    pub hardware: crate::runinfo::Hardware,
 }
 
 fn init_lora(
@@ -254,7 +260,15 @@ impl Run {
         Ok(())
     }
 
-    fn report(&self, objective: &str, base: &Path, cfg: &LoraTrainConfig, losses: Vec<f64>, t0: Instant) -> LoraReport {
+    fn report(
+        &self,
+        objective: &str,
+        base: &Path,
+        cfg: &LoraTrainConfig,
+        losses: Vec<f64>,
+        t0: Instant,
+        data_hash: String,
+    ) -> LoraReport {
         LoraReport {
             objective: objective.into(),
             base: base.display().to_string(),
@@ -265,8 +279,34 @@ impl Run {
             losses,
             seconds: t0.elapsed().as_secs_f64(),
             harpia_version: env!("CARGO_PKG_VERSION").into(),
+            data_hash,
+            hardware: crate::runinfo::Hardware::current(&self.device),
         }
     }
+}
+
+fn write_lora_card(out: &Path, base: &Path, report: &LoraReport, rows: usize) -> Result<()> {
+    let what = if report.objective == "dpo" { "preference-optimized (DPO)" } else { "supervised fine-tuned (SFT)" };
+    let mut card = crate::runinfo::base_card(
+        &out.file_name().map_or("adapter".into(), |n| n.to_string_lossy().into_owned()),
+        &format!(
+            "LoRA adapter, {what} with Harpia. PEFT-compatible (`adapter_config.json` + `adapter_model.safetensors`)."
+        ),
+        base,
+        &report.data_hash,
+        rows,
+    );
+    card.hyperparameters = match serde_json::to_value(&report.config)? {
+        serde_json::Value::Object(m) => m.into_iter().filter(|(_, v)| !v.is_null()).collect(),
+        _ => BTreeMap::new(),
+    };
+    if let (Some(first), Some(last)) = (report.losses.first(), report.losses.last()) {
+        card.metrics.insert("train_loss_first_step".into(), *first);
+        card.metrics.insert("train_loss_last_step".into(), *last);
+    }
+    card.intended_use =
+        Some("Load with `TextGenerator::load_with_adapter` in harpia-local, or with PEFT in Python.".into());
+    crate::runinfo::write_card(out, &card)
 }
 
 fn write_json(p: &Path, v: &serde_json::Value) -> Result<()> {
@@ -330,8 +370,9 @@ pub fn train_lora_sft(
             break;
         }
     }
-    let report = run.report("sft", base, cfg, losses, t0);
+    let report = run.report("sft", base, cfg, losses, t0, crate::runinfo::data_hash(samples)?);
     run.save(out, cfg, &report)?;
+    write_lora_card(out, base, &report, samples.len())?;
     Ok(report)
 }
 
@@ -416,7 +457,8 @@ pub fn train_lora_dpo(
             break;
         }
     }
-    let report = run.report("dpo", base, cfg, losses, t0);
+    let report = run.report("dpo", base, cfg, losses, t0, crate::runinfo::data_hash(pairs)?);
     run.save(out, cfg, &report)?;
+    write_lora_card(out, base, &report, pairs.len())?;
     Ok(report)
 }

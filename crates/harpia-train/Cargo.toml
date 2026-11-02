@@ -16,6 +16,8 @@ readme = "README.md"
 harpia-core = { workspace = true }
 harpia-data = { workspace = true, features = ["tokenizers"] }
 harpia-local = { workspace = true }
+harpia-eval = { workspace = true }
+xxhash-rust = { workspace = true }
 candle-core = { workspace = true }
 candle-nn = { workspace = true }
 serde = { workspace = true }

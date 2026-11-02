@@ -42,8 +42,10 @@ cuda = ["local", "harpia-local?/cuda"]
 metal = ["local", "harpia-local?/metal"]
 ## Fine-tuning (classifiers, LoRA SFT, DPO). Pure Rust on CPU.
 train = ["local", "dep:harpia-train"]
+## Evaluation: harness, LLM-as-judge, RAG metrics, calibration, reports, cost. Pure Rust.
+eval = ["data", "structured", "dep:harpia-eval"]
 ## Everything implemented so far, in pure Rust (add `tls` for HTTPS).
-full = ["text", "data", "structured", "langid", "tokenizers", "schema", "http", "client", "local", "hub", "train"]
+full = ["text", "data", "structured", "langid", "tokenizers", "schema", "http", "client", "local", "hub", "train", "eval"]
 
 [dependencies]
 harpia-core = { workspace = true }
@@ -54,6 +56,7 @@ harpia-http = { workspace = true, optional = true }
 harpia-client = { workspace = true, optional = true }
 harpia-local = { workspace = true, optional = true }
 harpia-train = { workspace = true, optional = true }
+harpia-eval = { workspace = true, optional = true }
 
 [dev-dependencies]
 serde = { workspace = true }

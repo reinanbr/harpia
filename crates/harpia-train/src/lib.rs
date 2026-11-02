@@ -23,6 +23,7 @@ mod classifier;
 mod lora;
 pub mod nn;
 pub mod optim;
+pub mod runinfo;
 
 pub use classifier::{ClassifierConfig, EpochReport, Example, Progress, TrainReport, train_classifier};
 pub use lora::{LoraConfig, LoraReport, LoraTrainConfig, PreferenceIds, train_lora_dpo, train_lora_sft};

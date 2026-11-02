@@ -1415,6 +1415,7 @@ dependencies = [
  "harpia-client",
  "harpia-core",
  "harpia-data",
+ "harpia-eval",
  "harpia-http",
  "harpia-local",
  "harpia-structured",
@@ -1498,7 +1499,19 @@ dependencies = [
 name = "harpia-eval"
 version = "0.1.0"
 dependencies = [
+ "futures-util",
  "harpia-core",
+ "harpia-data",
+ "harpia-structured",
+ "harpia-text",
+ "minijinja",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "tokio",
+ "toml",
+ "tracing",
+ "xxhash-rust",
 ]
 
 [[package]]
@@ -1581,6 +1594,7 @@ dependencies = [
  "candle-nn",
  "harpia-core",
  "harpia-data",
+ "harpia-eval",
  "harpia-local",
  "rayon",
  "serde",
@@ -1588,6 +1602,7 @@ dependencies = [
  "tempfile",
  "tokenizers",
  "tracing",
+ "xxhash-rust",
 ]
 
 [[package]]

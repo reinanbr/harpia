@@ -141,6 +141,12 @@ pub struct TrainReport {
     pub seconds: f64,
     /// Harpia version.
     pub harpia_version: String,
+    /// Content hash of the training examples.
+    #[serde(default)]
+    pub data_hash: String,
+    /// Where the run executed.
+    #[serde(default)]
+    pub hardware: crate::runinfo::Hardware,
 }
 
 fn head_names(model_type: &str) -> (&'static str, &'static str) {
@@ -340,10 +346,41 @@ pub fn train_classifier(
         best_val_macro_f1: best,
         seconds: t0.elapsed().as_secs_f64(),
         harpia_version: env!("CARGO_PKG_VERSION").into(),
+        data_hash: crate::runinfo::data_hash(train)?,
+        hardware: crate::runinfo::Hardware::current(&candle_core::Device::Cpu),
     };
     let p = out.join("train.json");
     std::fs::write(&p, serde_json::to_string_pretty(&report)?).map_err(|e| HarpiaError::io(&p, e))?;
+    let mut card = crate::runinfo::base_card(
+        &out.file_name().map_or("classifier".into(), |n| n.to_string_lossy().into_owned()),
+        &format!("Sequence classifier fine-tuned with Harpia (labels: {}).", cfg.labels.join(", ")),
+        base,
+        &report.data_hash,
+        train.len(),
+    );
+    card.datasets.push(harpia_eval::report::CardDataset {
+        name: "validation data".into(),
+        split: "validation".into(),
+        rows: Some(val.len()),
+        license: None,
+        hash: Some(crate::runinfo::data_hash(val)?),
+    });
+    card.hyperparameters = hyperparameters(cfg)?;
+    card.metrics.insert("val_macro_f1".into(), best);
+    if let Some(e) = report.history.iter().find(|e| e.val_macro_f1 == best) {
+        for (l, f) in &e.val_f1 {
+            card.metrics.insert(format!("val_f1_{l}"), *f);
+        }
+    }
+    crate::runinfo::write_card(out, &card)?;
     Ok(report)
+}
+
+fn hyperparameters<T: Serialize>(cfg: &T) -> Result<BTreeMap<String, serde_json::Value>> {
+    Ok(match serde_json::to_value(cfg)? {
+        serde_json::Value::Object(m) => m.into_iter().filter(|(_, v)| !v.is_null()).collect(),
+        _ => BTreeMap::new(),
+    })
 }
 
 /// The model's tokenizer with longest-first truncation at `max_len` and no padding.

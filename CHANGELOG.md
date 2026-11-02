@@ -6,6 +6,28 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added (milestone 5: eval and RAG retrieval)
+
+- `harpia-eval`: evaluation harness (TOML/JSON tasks: generation, multiple choice by
+  log-likelihood, perplexity / bits per byte, classification; seeded few-shot; `Provider` or
+  `Model` backends; concurrency; `JsonlCache` resume), `LlmJudge` (rubric scores, pairwise with
+  position swap, corrective retries) with Cohen's kappa / Pearson agreement, RAG metrics
+  (recall@k, precision@k, MRR, nDCG, context recall, faithfulness via `PairClassifier`, answer
+  relevance), generation metrics (EM, token F1, BLEU, chrF, ROUGE-N/L, edit distance),
+  classification reports, calibration (decision rules as data, grid search on validation,
+  frozen test evaluation that refuses the tuning data, best-of-N windows with evidence),
+  dataset contamination / label-noise reports, leaderboards, model cards, price tables and a
+  cost tracker with `tracing` spans (latency, time to first token, tokens/s).
+- `harpia-data::vector`: exact `FlatIndex` (parallel, batched) and deterministic `HnswIndex`,
+  both with incremental add/replace/delete, filters and a `.hvec` file format with a 64-byte
+  aligned vector block.
+- `harpia-data::rag`: `RagPipeline` (chunk → embed → index → BM25/dense retrieval → RRF or
+  weighted fusion → optional reranking → context within a token budget with citations to
+  document spans, sources and licenses), metadata filters, save/load.
+- `harpia-train`: `train.json` records a data hash and hardware; every run writes a model card
+  (`README.md`) through `harpia-eval`.
+- Umbrella feature `eval`.
+
 ### Added (pending-items pass)
 
 - `harpia_data::spm`: SentencePiece `ModelProto` reader (pure Rust protobuf) that builds a Unigram

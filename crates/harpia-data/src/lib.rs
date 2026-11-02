@@ -34,6 +34,7 @@ pub mod format;
 pub mod io;
 pub mod pack;
 pub mod pii;
+pub mod rag;
 pub mod rng;
 pub mod shard;
 pub mod split;
@@ -42,6 +43,7 @@ pub mod spm;
 pub mod template;
 #[cfg(feature = "tokenizers")]
 pub mod tokenize;
+pub mod vector;
 
 pub use cache::JsonlCache;
 pub use io::{JsonlReader, JsonlWriter, read_jsonl};

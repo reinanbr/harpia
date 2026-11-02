@@ -4,7 +4,7 @@
 //! every Harpia version, independently of `rand` crate releases.
 
 /// SplitMix64 generator.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SplitMix64 {
     state: u64,
 }

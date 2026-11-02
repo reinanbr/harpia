@@ -35,15 +35,15 @@ Harpia covers the full lifecycle of **data and large language models**:
 |---|---|---|
 | `harpia-core` | shared types, errors, spans, traits | **stable** |
 | `harpia-text` | normalization, segmentation with offsets, quality signals, similarity, fuzzy matching, BM25 | **stable** |
-| `harpia-data` | streaming IO, curation (filters, PII, dedup, decontamination), splits, chat templates with loss masks, packing, chunking, dataset cards | **stable** |
+| `harpia-data` | streaming IO, curation (filters, PII, dedup, decontamination), splits, chat templates with loss masks, packing, chunking, dataset cards, RAG retrieval (flat and HNSW vector indexes, BM25, hybrid fusion, reranking, filters, persistence, `RagPipeline` with cited context) | **stable** |
 | `harpia-structured` | JSON extraction and repair, streaming JSON, constrained-decoding constraints, tool-call parsing, JSON Schema | **stable** |
 | `harpia-http` | polite HTTP: offline guard, per-host rate limits, token buckets, retries honoring `Retry-After`, circuit breaker, `redb` TTL cache, size caps, blocking facade | **stable** |
 | `harpia-client` | OpenAI-compatible, Anthropic and Ollama providers with streaming and tool calls; structured output with validation and retries; middleware; RPM/TPM batch runner; synthetic data generation | **stable** |
 | `harpia` | umbrella crate re-exporting the above | **stable** |
 | `harpia-cli` | the `harpia` binary | **stable** (text, data and LLM commands) |
 | `harpia-local` | candle inference: sequence/pair classifiers and rerankers (BERT, RoBERTa, XLM-R; parity with transformers 1e-5), embeddings, Qwen2/Llama generation with constrained decoding and log-probs, MarianMT straight from Hub SentencePiece files (parity with transformers) | **stable** |
-| `harpia-train` | classifier / cross-encoder fine-tuning (verified on a real XLM-R model; checkpoints load in transformers), LoRA SFT with PEFT export, DPO (experimental) | **stable** |
-| `harpia-eval` | eval harness, judges, RAG metrics, calibration, model cards | planned (milestone 5) |
+| `harpia-train` | classifier / cross-encoder fine-tuning (verified on a real XLM-R model; checkpoints load in transformers), LoRA SFT with PEFT export, DPO (experimental); every run writes `train.json` and a model card | **stable** |
+| `harpia-eval` | eval harness (generation, multiple choice, perplexity, classification; few-shot, cached), LLM-as-judge with position swap and agreement, RAG metrics and faithfulness, generation and classification metrics, threshold calibration applied frozen, best-of-N windows, leaderboards, model cards, cost tracking | **stable** |
 | `harpia-verify` | grounding against trusted sources | planned (milestone 6) |
 
 "Stable" means implemented, documented and tested in this release; the API may still change
@@ -165,7 +165,9 @@ See [`docs/models.md`](docs/models.md) for supported architectures, verification
 | `transformers` Trainer for sequence classification | `harpia-train::train_classifier` | available (about 1.7× slower than PyTorch on CPU, see benchmarks) |
 | `peft` LoRA SFT, `trl` DPO | `harpia-train::{train_lora_sft, train_lora_dpo}` | available (verified on Qwen2.5-0.5B; DPO experimental) |
 | `huggingface_hub` snapshot downloads | `harpia-local::hub`, `harpia download` | available |
-| `lm-eval-harness` / `ragas` | `harpia-eval` | planned |
+| `lm-eval-harness` / `ragas` | `harpia-eval` | available |
+| `faiss` / `hnswlib` / vector stores, `rank_bm25`, `langchain` retrievers | `harpia-data::{vector, rag}` | available |
+| `sacrebleu`, `rouge-score`, `scikit-learn` classification metrics | `harpia-eval::{metrics, classification}` | available |
 | `httpx` + sqlite cache, `tenacity` retries | `harpia-http` | available |
 | `openai`, `anthropic`, `ollama` clients (chat, streaming, tools, embeddings) | `harpia-client` | available |
 | `instructor` (structured output with retries) | `harpia-client::chat_json`, `chat_typed` | available |
@@ -197,8 +199,8 @@ reference checking) are mapped to Harpia APIs in `docs/errei-mapping.md`.
    quantized models, LoRA adapter loading (with train), Hub downloads.
 4. **train**: done: classifier fine-tuning, LoRA SFT with PEFT export, DPO (experimental). Still
    to come: embedding fine-tuning, QLoRA, optimizer-state checkpoints.
-5. **eval**: harness, judges, RAG metrics, calibration, model cards; RAG retrieval in
-   `harpia-data`.
+5. **eval**: done: harness, judges, RAG metrics, calibration, model cards, cost tracking; RAG
+   retrieval (flat/HNSW, BM25, hybrid, rerank, `RagPipeline`) in `harpia-data`.
 6. **verify**: trusted-source registry, adapters, claim and reference verification.
 7. **serve**: `harpia serve --stdio` (JSON-RPC) and an OpenAI-compatible `serve --http`.
 
