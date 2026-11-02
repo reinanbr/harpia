@@ -8,7 +8,8 @@ Thanks for helping! A few rules keep the project healthy:
   tests are produced once by a human following `docs/parity.md` and checked in as JSON.
 - **Pure Rust by default.** A default or `full` build must not need a C/C++ toolchain. Before
   adding a dependency, check its features with `cargo tree -e features` and make sure no
-  `*-sys` crate appears. Native acceleration may only arrive as an opt-in, documented feature.
+  `*-sys` crate appears. Native code may only arrive as an opt-in, documented feature; today the
+  single exception is `tls` (rustls + `ring`), kept out of `full`.
 - **Offline by default.** Code that can touch the network takes a `NetworkPolicy` and does
   nothing when it is `Offline`. Tests never use the real network (use recorded fixtures).
 - **Deterministic.** Anything random takes an explicit seed (`harpia_data::rng::SplitMix64`).

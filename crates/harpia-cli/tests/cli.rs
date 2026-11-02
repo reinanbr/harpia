@@ -121,3 +121,59 @@ fn chunk_markdown() {
         .success()
         .stdout(predicate::str::contains("\"count\": 2"));
 }
+
+#[test]
+fn chat_without_online_flag_is_refused() {
+    harpia()
+        .args(["chat", "--provider", "ollama", "--model", "llama3.2", "hello"])
+        .assert()
+        .code(2)
+        .stderr(predicate::str::contains("offline"));
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn chat_and_synth_against_a_mock_openai_compatible_server() {
+    use wiremock::matchers::path;
+    use wiremock::{Mock, MockServer, ResponseTemplate};
+    let server = MockServer::start().await;
+    Mock::given(path("/v1/chat/completions"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+            "model": "local", "choices": [{"finish_reason": "stop", "message": {"content": "olá"}}],
+            "usage": {"prompt_tokens": 3, "completion_tokens": 1}})))
+        .mount(&server)
+        .await;
+    let base = format!("{}/v1", server.uri());
+    let dir = tempfile::tempdir().unwrap();
+    let tmpl = dir.path().join("t.toml");
+    fs::write(&tmpl, "model = \"x\"\nuser = \"Greet {{ name }}\"\noutput_field = \"greeting\"\n").unwrap();
+    let input = dir.path().join("in.jsonl");
+    fs::write(&input, "{\"name\": \"Ana\"}\n{\"name\": \"Bia\"}\n").unwrap();
+    let out = dir.path().join("out.jsonl");
+    let cache = dir.path().join("cache.jsonl");
+    let (base2, tmpl2, input2, out2, cache2) = (base.clone(), tmpl.clone(), input.clone(), out.clone(), cache.clone());
+    tokio::task::spawn_blocking(move || {
+        harpia()
+            .args(["chat", "--provider", "openai", "--model", "local", "--online", "--base-url", &base2, "hi"])
+            .assert()
+            .success()
+            .stdout(predicate::str::contains("olá"));
+        harpia()
+            .args(["data", "synth"])
+            .arg(&input2)
+            .args(["--provider", "openai", "--model", "local", "--online", "--base-url", &base2, "--template"])
+            .arg(&tmpl2)
+            .arg("--cache")
+            .arg(&cache2)
+            .arg("-o")
+            .arg(&out2)
+            .assert()
+            .success()
+            .stdout(predicate::str::contains("2 generated"));
+    })
+    .await
+    .unwrap();
+    let rows: Vec<serde_json::Value> =
+        fs::read_to_string(&out).unwrap().lines().map(|l| serde_json::from_str(l).unwrap()).collect();
+    assert_eq!(rows[1]["greeting"], "olá");
+    assert_eq!(rows[1]["_provenance"]["model"], "local");
+}

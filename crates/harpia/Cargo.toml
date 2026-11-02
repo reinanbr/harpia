@@ -1,6 +1,6 @@
 [package]
 name = "harpia"
-description = "Sharp-eyed LLM tooling in pure Rust: data curation, structured output, local inference, training and evaluation."
+description = "Sharp-eyed LLM tooling in pure Rust: data curation, structured output, API clients, local inference, training and evaluation."
 keywords = ["llm", "nlp", "dataset", "machine-learning", "ai"]
 categories = ["science", "text-processing"]
 version.workspace = true
@@ -26,21 +26,27 @@ langid = ["text", "harpia-text?/langid", "harpia-data?/langid"]
 tokenizers = ["data", "harpia-data?/tokenizers"]
 ## JSON Schema validation and schema derivation.
 schema = ["structured", "harpia-structured?/schema"]
-## Everything implemented so far.
-full = ["text", "data", "structured", "langid", "tokenizers", "schema"]
+## Polite HTTP layer (offline by default). Pure Rust; `http://` only unless `tls` is enabled.
+http = ["dep:harpia-http"]
+## LLM API clients (OpenAI-compatible, Anthropic, Ollama), structured output, batch runner, synthetic data.
+client = ["http", "data", "structured", "dep:harpia-client", "harpia-client?/openai-compatible", "harpia-client?/anthropic", "harpia-client?/ollama"]
+## HTTPS via rustls + `ring`. NOTE: `ring` contains C/assembly and needs a C compiler.
+tls = ["http", "harpia-http?/tls", "harpia-client?/tls"]
+## Everything implemented so far, in pure Rust (add `tls` for HTTPS).
+full = ["text", "data", "structured", "langid", "tokenizers", "schema", "http", "client"]
 
 [dependencies]
 harpia-core = { workspace = true }
 harpia-text = { workspace = true, optional = true }
 harpia-data = { workspace = true, optional = true }
 harpia-structured = { workspace = true, optional = true }
+harpia-http = { workspace = true, optional = true }
+harpia-client = { workspace = true, optional = true }
 
 [dev-dependencies]
 serde = { workspace = true }
-
-[lints]
-workspace = true
-
+tokio = { workspace = true, features = ["rt", "macros"] }
+futures-util = { workspace = true }
 [dev-dependencies.serde_json]
 workspace = true
 
@@ -63,3 +69,11 @@ required-features = ["structured"]
 name = "rag_chunking"
 path = "../../examples/rag_chunking.rs"
 required-features = ["data"]
+
+[lints]
+workspace = true
+
+[[example]]
+name = "streaming_client"
+path = "../../examples/streaming_client.rs"
+required-features = ["client"]

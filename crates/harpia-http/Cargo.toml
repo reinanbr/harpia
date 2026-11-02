@@ -1,8 +1,8 @@
 [package]
 name = "harpia-http"
-description = "Polite HTTP for LLM and data pipelines: offline by default, per-host rate limits, retries, circuit breaker, TTL cache."
-keywords = ["llm", "nlp", "machine-learning", "ai", "dataset"]
-categories = ["science", "text-processing"]
+description = "Polite HTTP for LLM and data pipelines: offline by default, per-host rate limits, retries honoring Retry-After, circuit breaker, TTL cache, size caps."
+keywords = ["http", "llm", "rate-limit", "retry", "cache"]
+categories = ["web-programming::http-client", "network-programming"]
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -12,8 +12,33 @@ homepage.workspace = true
 authors.workspace = true
 readme = "README.md"
 
+[features]
+default = ["tls"]
+## HTTPS via rustls with the `ring` crypto provider. NOTE: `ring` contains C and assembly and
+## needs a C compiler. Without this feature the crate is pure Rust and supports `http://` only
+## (enough for local servers such as Ollama, vLLM or llama.cpp).
+tls = ["reqwest/rustls-no-provider", "dep:rustls"]
+
 [dependencies]
 harpia-core = { workspace = true }
+reqwest = { workspace = true }
+rustls = { workspace = true, optional = true }
+tokio = { workspace = true }
+futures-util = { workspace = true }
+futures-core = { workspace = true }
+bytes = { workspace = true }
+redb = { workspace = true }
+sha2 = { workspace = true }
+httpdate = { workspace = true }
+tracing = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+xxhash-rust = { workspace = true }
+
+[dev-dependencies]
+wiremock = { workspace = true }
+tokio = { workspace = true, features = ["rt-multi-thread", "macros", "net"] }
+tempfile = { workspace = true }
 
 [lints]
 workspace = true

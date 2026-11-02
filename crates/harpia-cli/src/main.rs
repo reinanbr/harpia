@@ -3,6 +3,7 @@
 #![warn(missing_docs)]
 
 mod data_cmd;
+mod llm_cmd;
 mod text_cmd;
 mod util;
 
@@ -27,6 +28,8 @@ const EXAMPLES: &str = "Examples:
   harpia similarity a.txt b.txt --k 5
   harpia chunk doc.md --strategy markdown --size 1200
   harpia repair-json broken.json
+  harpia chat --provider anthropic --model claude-opus-5-5 --online 'Summarize RAG in one line'
+  harpia data synth topics.jsonl --provider ollama --model llama3.2 --template qa.toml --online -o qa.jsonl
   harpia data filter raw.jsonl --preset gopher-like -o clean.jsonl --report report.json
   harpia data pack chat.jsonl --tokenizer tokenizer.json --template chatml --seq-len 2048 -o packed.jsonl
 
@@ -46,6 +49,8 @@ enum Command {
     CountTokens(text_cmd::CountTokensArgs),
     /// Extract and repair JSON from LLM output.
     RepairJson(text_cmd::RepairArgs),
+    /// Chat with an LLM provider (OpenAI-compatible, Anthropic, Ollama). Needs --online.
+    Chat(llm_cmd::ChatArgs),
     /// Dataset tools (inspect, convert, filter, pii, dedup, decontaminate, split, template, pack).
     #[command(subcommand)]
     Data(data_cmd::DataCommand),
@@ -60,6 +65,7 @@ fn main() -> ExitCode {
         Command::Chunk(a) => text_cmd::chunk(a, cli.format),
         Command::CountTokens(a) => text_cmd::count_tokens(a, cli.format),
         Command::RepairJson(a) => text_cmd::repair_json(a, cli.format),
+        Command::Chat(a) => llm_cmd::chat(a, cli.format),
         Command::Data(c) => data_cmd::run(c, cli.format),
     };
     match result {

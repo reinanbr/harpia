@@ -53,7 +53,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@1.88
+      - uses: dtolnay/rust-toolchain@1.90
       - uses: Swatinem/rust-cache@v2
       - run: cargo check --workspace --all-features --all-targets
 
@@ -63,10 +63,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
-      - run: CC=false CXX=false cargo build --workspace --all-features
+      - run: CC=false CXX=false cargo build -p harpia --features full
+      - run: CC=false CXX=false cargo build -p harpia-cli --no-default-features
       - name: no -sys crates in the dependency graph
         run: |
-          if cargo tree --workspace --all-features -e normal,build --prefix none | grep -E -- '-sys v'; then
+          if cargo tree -p harpia --features full -e normal,build --prefix none | grep -E -- '-sys v|^ring v|^cc v'; then
             echo "native dependency found" && exit 1
           fi
 

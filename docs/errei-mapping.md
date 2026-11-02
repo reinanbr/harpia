@@ -19,8 +19,8 @@ Status legend: **done** (in 0.1), **planned (Mn)** (milestone n), **gap** (not y
 | `checkers/plagio.py` | corpus similarity, PDF corpus files | similarity: done; PDF text: `harpia-data` feature `pdf` | PDF planned (M2) |
 | `checkers/ia.py` | burstiness, repetition, diversity, phrase lists, external detector | `stats::{burstiness, top_ngram_fraction, mattr}`, `PhraseMatcher`, `harpia_core::traits::Detector` | done |
 | `checkers/refs.py` `_ratio`, `partial_ratio` | rapidfuzz `token_set_ratio`, `partial_ratio` | `harpia_text::fuzzy::{token_set_ratio, partial_ratio}` | done |
-| `net/client.py` | per-host rate limits, `Retry-After`, retries with jitter, circuit breaker, size caps, offline guard | `harpia-http` | planned (M2) |
-| `net/cache.py` | SQLite TTL cache | `harpia-http` cache on `redb` | planned (M2) |
+| `net/client.py` | per-host rate limits, `Retry-After`, retries with jitter, circuit breaker, size caps, offline guard | `harpia_http::{HttpClient, blocking::HttpClient, HttpConfig::host_interval}`, `status()`, `download` | done |
+| `net/cache.py` | SQLite TTL cache | `harpia_http::CacheConfig` (`redb`, `mailto` excluded from keys by default) | done |
 | `net/sources.py` | Crossref, OpenAlex, Semantic Scholar, arXiv adapters | `harpia-verify` adapters | planned (M6) |
 | `checkers/refs.py` reference matching | fuzzy title/author/year match → confirmed/divergent/not found, retractions | `harpia-verify` reference verification | planned (M6) |
 | `citecheck.py` `Classificador` | XLM-RoBERTa pair classification, label aliases, length-limited batches, load once per process | `harpia-local` `AutoSequenceClassifier` + `PairClassifier` | planned (M3) |
@@ -30,7 +30,7 @@ Status legend: **done** (in 0.1), **planned (Mn)** (milestone n), **gap** (not y
 | `treino/preparar.py`, `comum.py` | JSONL IO, seeded splits | `harpia_data::{read_jsonl, JsonlWriter}`, `split::{random_split, group_split}`, `rng::SplitMix64` | done |
 | `treino/treinar.py` | cross-encoder fine-tuning: AdamW, warmup/linear decay, clipping, class weights, macro-F1 per epoch, best checkpoint | `harpia-train`; class weights: `harpia_data::split::class_weights` | weights done; training planned (M4) |
 | `treino/avaliar.py`, `finalizar.py` | per-class P/R/F1, macro F1, threshold grid search on val, frozen test, baseline, model card | `harpia-eval` | planned (M5) |
-| `tests/test_acceptance.py` "no network unless `--online`" | offline guarantee | `NetworkPolicy::Offline` default | type done; enforcement arrives with `harpia-http` (M2) |
+| `tests/test_acceptance.py` "no network unless `--online`" | offline guarantee | `NetworkPolicy::Offline` default, enforced in `harpia-http`; `harpia_http::testing::ConnectionCounter` | done |
 | `tests/test_performance.py` 20 files < 5 s | text throughput | `harpia-text` benches: segmentation + signals + Flesch + MATTR + shingles on 128 KB take ≈ 7 ms on an i5-12450H (see `benchmarks.md`) | done |
 
 ## Gaps

@@ -39,6 +39,8 @@ pub enum DataCommand {
     Template(TemplateArgs),
     /// Tokenize, mask and pack chat rows into fixed-length sequences.
     Pack(PackArgs),
+    /// Generate synthetic data with an LLM from a prompt template (resumable). Needs --online.
+    Synth(crate::llm_cmd::SynthArgs),
 }
 
 pub fn run(cmd: DataCommand, format: OutputFormat) -> Result<ExitCode> {
@@ -52,6 +54,7 @@ pub fn run(cmd: DataCommand, format: OutputFormat) -> Result<ExitCode> {
         DataCommand::Split(a) => split(a, format),
         DataCommand::Template(a) => template(a, format),
         DataCommand::Pack(a) => pack_cmd(a, format),
+        DataCommand::Synth(a) => crate::llm_cmd::synth(a, format),
     }
 }
 

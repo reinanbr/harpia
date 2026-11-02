@@ -1,8 +1,8 @@
 [package]
 name = "harpia-client"
-description = "Unified typed async clients for LLM APIs (OpenAI-compatible, Anthropic, Ollama) built on harpia-http."
-keywords = ["llm", "nlp", "machine-learning", "ai", "dataset"]
-categories = ["science", "text-processing"]
+description = "Unified typed async LLM clients (OpenAI-compatible, Anthropic, Ollama) with streaming, tool calls, structured output and a rate-limited batch runner."
+keywords = ["llm", "openai", "anthropic", "ollama", "client"]
+categories = ["api-bindings", "web-programming::http-client"]
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -12,8 +12,36 @@ homepage.workspace = true
 authors.workspace = true
 readme = "README.md"
 
+[features]
+default = ["openai-compatible", "anthropic", "ollama", "tls"]
+## OpenAI Chat Completions API and compatible servers (vLLM, llama.cpp, LM Studio, OpenRouter...).
+openai-compatible = []
+## Anthropic Messages API (raw HTTP, API version 2026-10-21).
+anthropic = []
+## Ollama native API.
+ollama = []
+## HTTPS (rustls + ring; see harpia-http). Without it only `http://` endpoints work, in pure Rust.
+tls = ["harpia-http/tls"]
+
 [dependencies]
 harpia-core = { workspace = true }
+harpia-http = { workspace = true }
+harpia-structured = { workspace = true, features = ["schema"] }
+harpia-data = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+futures-util = { workspace = true }
+futures-core = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+minijinja = { workspace = true }
+toml = { workspace = true }
+xxhash-rust = { workspace = true }
+
+[dev-dependencies]
+wiremock = { workspace = true }
+tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }
+tempfile = { workspace = true }
 
 [lints]
 workspace = true

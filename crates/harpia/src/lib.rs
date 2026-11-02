@@ -9,7 +9,9 @@
 //! | `text` | `harpia-text` | `text` (default) | stable |
 //! | `data` | `harpia-data` | `data` (default) | stable |
 //! | `structured` | `harpia-structured` | `structured` (default) | stable |
-//! | — | `harpia-http`, `harpia-client`, `harpia-local`, `harpia-train`, `harpia-eval`, `harpia-verify` | — | planned |
+//! | `http` | `harpia-http` | `http` (+ `tls` for HTTPS) | stable |
+//! | `client` | `harpia-client` | `client` | stable |
+//! | — | `harpia-local`, `harpia-train`, `harpia-eval`, `harpia-verify` | — | planned |
 //!
 //! ```
 //! # #[cfg(all(feature = "data", feature = "structured"))] {
@@ -26,9 +28,13 @@
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
 
+#[cfg(feature = "client")]
+pub use harpia_client as client;
 pub use harpia_core as core;
 #[cfg(feature = "data")]
 pub use harpia_data as data;
+#[cfg(feature = "http")]
+pub use harpia_http as http;
 #[cfg(feature = "structured")]
 pub use harpia_structured as structured;
 #[cfg(feature = "text")]

@@ -12,6 +12,12 @@ homepage.workspace = true
 authors.workspace = true
 readme = "README.md"
 
+[features]
+default = ["tls"]
+## HTTPS for `harpia chat` and `data synth` against hosted APIs (rustls + ring, needs a C compiler).
+## Build with `--no-default-features` for a pure-Rust binary that talks to `http://` servers only.
+tls = ["harpia/tls"]
+
 [[bin]]
 name = "harpia"
 path = "src/main.rs"
@@ -20,6 +26,8 @@ doc = false
 
 [dependencies]
 harpia = { workspace = true, features = ["full"] }
+tokio = { workspace = true, features = ["rt-multi-thread"] }
+futures-util = { workspace = true }
 clap = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
@@ -28,6 +36,8 @@ serde_json = { workspace = true }
 assert_cmd = { workspace = true }
 predicates = { workspace = true }
 tempfile = { workspace = true }
+wiremock = { workspace = true }
+tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }
 
 [lints]
 workspace = true

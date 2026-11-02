@@ -6,6 +6,32 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- `harpia-http`: offline-by-default polite client (async + blocking): per-host intervals,
+  token buckets for RPM/TPM, retries on transport errors/429/5xx with jittered backoff honoring
+  `Retry-After` (seconds or HTTP date), per-host circuit breaker with `status()`, `redb` TTL
+  cache keyed on method/URL/sorted params/body hash with excluded params, body size caps,
+  capped content-addressed downloads, streaming responses, and `testing::ConnectionCounter`
+  to prove that offline code opens no sockets.
+- `harpia-client`: `OpenAiCompatible`, `Anthropic` (raw HTTP, API version `2026-10-21`) and
+  `Ollama` providers with chat, SSE/NDJSON streaming, tool calls and embeddings; `chat_json` /
+  `chat_typed` structured output with validation and corrective retries; middleware
+  (`UsageTracker`, `DefaultSystemPrompt`); `BatchRunner` with bounded concurrency, RPM/TPM
+  budgets and `JsonlCache` resume; `synthesize` + `SynthTemplate` for synthetic data with
+  provenance.
+- CLI: `harpia chat` and `harpia data synth` (both require `--online`).
+- Umbrella features `http`, `client` and `tls`.
+
+### Changed
+
+- MSRV raised to 1.90 (required by `redb` 4).
+- `harpia-data` and `harpia-http` are workspace dependencies without default features; enable
+  `langid` / `tls` explicitly.
+- HTTPS (`tls` feature) uses rustls + `ring`, which contains C/assembly: the only opt-in
+  exception to the no-C-toolchain rule. Everything else, including `full`, builds with
+  `CC=false CXX=false`.
+
 ## [0.1.0] - 2026-11-02
 
 ### Added
