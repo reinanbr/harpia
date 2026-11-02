@@ -1,0 +1,19 @@
+[package]
+name = "harpia-local"
+description = "Pure-Rust local inference with candle: decoder LLMs, encoders, rerankers and seq2seq models."
+keywords = ["llm", "nlp", "machine-learning", "ai", "dataset"]
+categories = ["science", "text-processing"]
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+authors.workspace = true
+readme = "README.md"
+
+[dependencies]
+harpia-core = { workspace = true }
+
+[lints]
+workspace = true

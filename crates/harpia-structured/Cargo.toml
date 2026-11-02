@@ -1,0 +1,38 @@
+[package]
+name = "harpia-structured"
+description = "Structured LLM output in pure Rust: JSON extraction and repair, streaming JSON, schema validation, constrained-decoding grammars, tool-call parsing."
+keywords = ["llm", "json", "json-repair", "structured-output", "grammar"]
+categories = ["parsing", "text-processing"]
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+authors.workspace = true
+readme = "README.md"
+
+[features]
+default = []
+## JSON Schema validation (`jsonschema`) and schema derivation from Rust types (`schemars`).
+schema = ["dep:jsonschema", "dep:schemars"]
+
+[dependencies]
+harpia-core = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+regex-automata = { workspace = true }
+rayon = { workspace = true }
+jsonschema = { workspace = true, optional = true }
+schemars = { workspace = true, optional = true }
+
+[dev-dependencies]
+proptest = { workspace = true }
+criterion = { workspace = true }
+
+[lints]
+workspace = true
+
+[[bench]]
+name = "repair"
+harness = false

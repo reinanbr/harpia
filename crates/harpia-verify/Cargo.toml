@@ -1,0 +1,19 @@
+[package]
+name = "harpia-verify"
+description = "Grounding and fact-checking for LLM pipelines against user-trusted online sources."
+keywords = ["llm", "nlp", "machine-learning", "ai", "dataset"]
+categories = ["science", "text-processing"]
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+authors.workspace = true
+readme = "README.md"
+
+[dependencies]
+harpia-core = { workspace = true }
+
+[lints]
+workspace = true

@@ -1,0 +1,43 @@
+[package]
+name = "harpia-data"
+description = "LLM datasets in pure Rust: streaming IO, curation (filters, PII, dedup, decontamination), chat templates with loss masks, packing and chunking."
+keywords = ["llm", "dataset", "deduplication", "fine-tuning", "rag"]
+categories = ["science", "text-processing"]
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+authors.workspace = true
+readme = "README.md"
+
+[features]
+default = ["langid"]
+## Language identification filter (via harpia-text).
+langid = ["harpia-text/langid"]
+## Hugging Face `tokenizers` backend (pure Rust: no `onig`, no `esaxx` C++).
+tokenizers = ["dep:tokenizers"]
+
+[dependencies]
+harpia-core = { workspace = true }
+harpia-text = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+regex = { workspace = true }
+rayon = { workspace = true }
+xxhash-rust = { workspace = true }
+flate2 = { workspace = true }
+ruzstd = { workspace = true }
+csv = { workspace = true }
+toml = { workspace = true }
+minijinja = { workspace = true }
+minijinja-contrib = { workspace = true }
+tokenizers = { workspace = true, optional = true }
+
+[dev-dependencies]
+proptest = { workspace = true }
+tempfile = { workspace = true }
+
+[lints]
+workspace = true

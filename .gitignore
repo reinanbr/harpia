@@ -1,0 +1,16 @@
+/target
+**/*.rs.bk
+Cargo.lock.bak
+# model weights, datasets and caches never belong in the repo
+*.safetensors
+*.gguf
+*.bin
+*.pt
+*.onnx
+/models/
+/data/
+/datasets/
+/.cache/
+*.jsonl.gz
+*.parquet
+.DS_Store

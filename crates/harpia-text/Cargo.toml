@@ -1,0 +1,39 @@
+[package]
+name = "harpia-text"
+description = "Text primitives for LLM data pipelines: normalization, segmentation with offsets, quality signals, similarity, fuzzy matching, BM25."
+keywords = ["nlp", "text", "segmentation", "minhash", "bm25"]
+categories = ["text-processing", "science"]
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+authors.workspace = true
+readme = "README.md"
+
+[features]
+default = ["langid"]
+## Language identification via `whatlang` (pure Rust).
+langid = ["dep:whatlang"]
+
+[dependencies]
+harpia-core = { workspace = true }
+serde = { workspace = true }
+unicode-normalization = { workspace = true }
+aho-corasick = { workspace = true }
+rayon = { workspace = true }
+xxhash-rust = { workspace = true }
+whatlang = { workspace = true, optional = true }
+
+[dev-dependencies]
+proptest = { workspace = true }
+criterion = { workspace = true }
+
+
+[lints]
+workspace = true
+
+[[bench]]
+name = "text"
+harness = false

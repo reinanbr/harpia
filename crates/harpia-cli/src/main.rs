@@ -1,0 +1,72 @@
+//! The `harpia` command line.
+#![forbid(unsafe_code)]
+#![warn(missing_docs)]
+
+mod data_cmd;
+mod text_cmd;
+mod util;
+
+use clap::{Parser, Subcommand};
+use std::process::ExitCode;
+
+/// Sharp-eyed LLM tooling in pure Rust.
+#[derive(Parser)]
+#[command(name = "harpia", version, about, long_about = None, after_help = EXAMPLES)]
+struct Cli {
+    /// Output format.
+    #[arg(long, global = true, value_enum, default_value_t = util::OutputFormat::Text)]
+    format: util::OutputFormat,
+
+    #[command(subcommand)]
+    command: Command,
+}
+
+const EXAMPLES: &str = "Examples:
+  harpia segment paper.txt --unit sentences --lang pt-br
+  harpia stats paper.txt --lang en --format json
+  harpia similarity a.txt b.txt --k 5
+  harpia chunk doc.md --strategy markdown --size 1200
+  harpia repair-json broken.json
+  harpia data filter raw.jsonl --preset gopher-like -o clean.jsonl --report report.json
+  harpia data pack chat.jsonl --tokenizer tokenizer.json --template chatml --seq-len 2048 -o packed.jsonl
+
+Exit codes: 0 ok, 1 a check failed, 2 usage or environment error.";
+
+#[derive(Subcommand)]
+enum Command {
+    /// Split text into words, sentences or paragraphs with byte offsets and line:column.
+    Segment(text_cmd::SegmentArgs),
+    /// Readability and quality signals of a text.
+    Stats(text_cmd::StatsArgs),
+    /// Shingle similarity between two texts.
+    Similarity(text_cmd::SimilarityArgs),
+    /// Chunk a document for RAG.
+    Chunk(text_cmd::ChunkArgs),
+    /// Count tokens with a `tokenizer.json`.
+    CountTokens(text_cmd::CountTokensArgs),
+    /// Extract and repair JSON from LLM output.
+    RepairJson(text_cmd::RepairArgs),
+    /// Dataset tools (inspect, convert, filter, pii, dedup, decontaminate, split, template, pack).
+    #[command(subcommand)]
+    Data(data_cmd::DataCommand),
+}
+
+fn main() -> ExitCode {
+    let cli = Cli::parse();
+    let result = match cli.command {
+        Command::Segment(a) => text_cmd::segment(a, cli.format),
+        Command::Stats(a) => text_cmd::stats(a, cli.format),
+        Command::Similarity(a) => text_cmd::similarity(a, cli.format),
+        Command::Chunk(a) => text_cmd::chunk(a, cli.format),
+        Command::CountTokens(a) => text_cmd::count_tokens(a, cli.format),
+        Command::RepairJson(a) => text_cmd::repair_json(a, cli.format),
+        Command::Data(c) => data_cmd::run(c, cli.format),
+    };
+    match result {
+        Ok(code) => code,
+        Err(e) => {
+            eprintln!("error: {e}");
+            ExitCode::from(2)
+        }
+    }
+}

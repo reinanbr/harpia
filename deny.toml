@@ -1,0 +1,42 @@
+# cargo-deny configuration: https://embarkstudios.github.io/cargo-deny/
+
+[graph]
+all-features = true
+
+[advisories]
+yanked = "deny"
+
+[licenses]
+confidence-threshold = 0.9
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "Unicode-3.0",
+    "Unicode-DFS-2016",
+    "Zlib",
+    "MPL-2.0",
+    "CC0-1.0",
+    "BSL-1.0",
+]
+
+[bans]
+multiple-versions = "warn"
+wildcards = "deny"
+# Pure-Rust guarantee: these pull C/C++ code and are forbidden in the default graph.
+deny = [
+    { crate = "openssl-sys" },
+    { crate = "onig_sys" },
+    { crate = "libsqlite3-sys" },
+    { crate = "zstd-sys" },
+    { crate = "libz-sys" },
+    { crate = "bzip2-sys" },
+    { crate = "lzma-sys" },
+]
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"

@@ -1,0 +1,65 @@
+[package]
+name = "harpia"
+description = "Sharp-eyed LLM tooling in pure Rust: data curation, structured output, local inference, training and evaluation."
+keywords = ["llm", "nlp", "dataset", "machine-learning", "ai"]
+categories = ["science", "text-processing"]
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+authors.workspace = true
+readme = "../../README.md"
+
+[features]
+default = ["text", "data", "structured"]
+## Text primitives (segmentation, statistics, similarity, fuzzy matching, BM25).
+text = ["dep:harpia-text"]
+## Dataset IO, curation, chat templates, packing and chunking.
+data = ["text", "dep:harpia-data"]
+## JSON extraction/repair, streaming JSON, constrained-decoding grammars, tool calls.
+structured = ["dep:harpia-structured"]
+## Language identification.
+langid = ["text", "harpia-text?/langid", "harpia-data?/langid"]
+## Hugging Face tokenizers backend (pure Rust).
+tokenizers = ["data", "harpia-data?/tokenizers"]
+## JSON Schema validation and schema derivation.
+schema = ["structured", "harpia-structured?/schema"]
+## Everything implemented so far.
+full = ["text", "data", "structured", "langid", "tokenizers", "schema"]
+
+[dependencies]
+harpia-core = { workspace = true }
+harpia-text = { workspace = true, optional = true }
+harpia-data = { workspace = true, optional = true }
+harpia-structured = { workspace = true, optional = true }
+
+[dev-dependencies]
+serde = { workspace = true }
+
+[lints]
+workspace = true
+
+[dev-dependencies.serde_json]
+workspace = true
+
+[[example]]
+name = "quickstart"
+path = "../../examples/quickstart.rs"
+required-features = ["data", "structured"]
+
+[[example]]
+name = "llm_data_pipeline"
+path = "../../examples/llm_data_pipeline.rs"
+required-features = ["data"]
+
+[[example]]
+name = "json_repair"
+path = "../../examples/json_repair.rs"
+required-features = ["structured"]
+
+[[example]]
+name = "rag_chunking"
+path = "../../examples/rag_chunking.rs"
+required-features = ["data"]

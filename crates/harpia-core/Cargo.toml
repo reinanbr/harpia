@@ -1,0 +1,22 @@
+[package]
+name = "harpia-core"
+description = "Shared types, errors and traits for the Harpia LLM toolkit."
+keywords = ["llm", "nlp", "machine-learning", "ai", "dataset"]
+categories = ["science", "text-processing"]
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+authors.workspace = true
+readme = "README.md"
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+futures-core = { workspace = true }
+
+[lints]
+workspace = true
