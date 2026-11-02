@@ -239,10 +239,22 @@ impl Node {
     }
 
     fn allows(&self, t: &str) -> bool {
-        match &self.types {
+        let by_type = match &self.types {
             None => true,
             Some(s) => s.contains(t) || (t == "integer" && s.contains("number")),
-        }
+        };
+        // an enum/const restricts the JSON types to those of its values
+        let by_enum = self.enum_values.as_ref().is_none_or(|vals| {
+            vals.iter().any(|v| match v {
+                Value::Object(_) => t == "object",
+                Value::Array(_) => t == "array",
+                Value::String(_) => t == "string",
+                Value::Bool(_) => t == "boolean",
+                Value::Null => t == "null",
+                Value::Number(n) => t == "number" || (t == "integer" && (n.is_i64() || n.is_u64())),
+            })
+        });
+        by_type && by_enum
     }
 
     fn property(&self, key: &str) -> Option<Option<&Node>> {
@@ -621,6 +633,20 @@ mod tests {
         assert_eq!(c.check(r#"["a", "b"]"#), PrefixStatus::Complete);
         assert_eq!(c.check(r#"["a", 1"#), PrefixStatus::Invalid);
         assert_eq!(c.check(r#"["a", "b", "#), PrefixStatus::Invalid);
+    }
+
+    #[test]
+    fn enum_without_type_restricts_json_types() {
+        let c = JsonSchemaConstraint::new(
+            &json!({"type": "object", "properties": {"label": {"enum": ["a", "b"]}}, "required": ["label"]}),
+        )
+        .unwrap();
+        assert_eq!(c.check(r#"{"label":{"#), PrefixStatus::Invalid);
+        assert_eq!(c.check(r#"{"label":1"#), PrefixStatus::Invalid);
+        assert_eq!(c.check(r#"{"label":"a"}"#), PrefixStatus::Complete);
+        let n = JsonSchemaConstraint::new(&json!({"enum": [1, 2]})).unwrap();
+        assert_eq!(n.check("2 "), PrefixStatus::Complete);
+        assert_eq!(n.check("\"x"), PrefixStatus::Invalid);
     }
 
     #[test]

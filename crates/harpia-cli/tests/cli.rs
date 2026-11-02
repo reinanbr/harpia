@@ -177,3 +177,52 @@ async fn chat_and_synth_against_a_mock_openai_compatible_server() {
     assert_eq!(rows[1]["greeting"], "olá");
     assert_eq!(rows[1]["_provenance"]["model"], "local");
 }
+
+#[test]
+fn local_classify_generate_embed_and_chat() {
+    use harpia::local::testing;
+    let dir = tempfile::tempdir().unwrap();
+    let nli = dir.path().join("nli");
+    testing::xlm_roberta_classifier(&nli, &["supports", "neutral", "contradicts"]).unwrap();
+    let pairs = dir.path().join("pairs.jsonl");
+    fs::write(&pairs, "{\"evidence\": \"the harpy eagle eats sloths\", \"claim\": \"the eagle eats monkeys\"}\n")
+        .unwrap();
+    let out = harpia()
+        .args(["classify", "--model"])
+        .arg(&nli)
+        .arg(&pairs)
+        .args(["--premise", "evidence", "--hypothesis", "claim"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let row: serde_json::Value = serde_json::from_slice(&out).unwrap();
+    assert!(["supports", "neutral", "contradicts"].contains(&row["label"].as_str().unwrap()));
+    assert_eq!(row["scores"].as_object().unwrap().len(), 3);
+
+    harpia()
+        .args(["embed", "--model"])
+        .arg(&nli)
+        .arg(&pairs)
+        .args(["--field", "claim"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"embedding\""));
+
+    let lm = dir.path().join("lm");
+    testing::qwen2(&lm).unwrap();
+    harpia()
+        .args(["generate", "--model"])
+        .arg(&lm)
+        .args(["--choices", "yes,no", "--format", "json", "the bird"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"text\": \"yes\"").or(predicate::str::contains("\"text\": \"no\"")));
+    harpia()
+        .args(["chat", "--provider", "local", "--model"])
+        .arg(&lm)
+        .args(["--max-tokens", "4", "hello"])
+        .assert()
+        .success();
+}

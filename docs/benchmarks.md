@@ -34,3 +34,15 @@ shingling here; real corpora with more distinct shingles will cost more per byte
 `json_repair` and transformers will be added only when run on the same machine, with the
 versions, hardware and commit recorded here. Protocol: same input files, warm caches, median
 of at least 10 runs, single thread unless stated.
+
+## errei-cita-v1 (XLM-R cross-encoder, 107 M parameters, f32, CPU)
+
+Measured on the same machine (i5-12450H) on the 50 parity pairs (`max_length` 192, batches of
+32, length-sorted), release build, rustc 1.97.1. PyTorch: best of 3 runs, 8 threads.
+
+| | model load | throughput |
+|---|---:|---:|
+| Harpia (`SequenceClassifier`, candle 0.11) | 1.6–1.9 s | 18–19 pairs/s |
+| PyTorch 2.15.0+cpu / transformers 5.22.1 | 3.1 s | 20.9 pairs/s |
+
+Harpia loads faster and runs about 10% slower on this workload; the logits agree to 1e-5.

@@ -20,6 +20,8 @@ pub enum ProviderKind {
     Anthropic,
     /// Local Ollama server.
     Ollama,
+    /// A local decoder model directory given in --model (no network).
+    Local,
 }
 
 /// Provider selected at runtime.
@@ -27,6 +29,7 @@ pub enum AnyProvider {
     OpenAi(OpenAiCompatible),
     Anthropic(Anthropic),
     Ollama(Ollama),
+    Local(Box<harpia::local::TextGenerator>),
 }
 
 impl Provider for AnyProvider {
@@ -35,6 +38,7 @@ impl Provider for AnyProvider {
             AnyProvider::OpenAi(p) => p.name(),
             AnyProvider::Anthropic(p) => p.name(),
             AnyProvider::Ollama(p) => p.name(),
+            AnyProvider::Local(p) => p.name(),
         }
     }
 
@@ -43,6 +47,7 @@ impl Provider for AnyProvider {
             AnyProvider::OpenAi(p) => p.chat(request).await,
             AnyProvider::Anthropic(p) => p.chat(request).await,
             AnyProvider::Ollama(p) => p.chat(request).await,
+            AnyProvider::Local(p) => p.chat(request).await,
         }
     }
 
@@ -51,6 +56,7 @@ impl Provider for AnyProvider {
             AnyProvider::OpenAi(p) => p.chat_stream(request).await,
             AnyProvider::Anthropic(p) => p.chat_stream(request).await,
             AnyProvider::Ollama(p) => p.chat_stream(request).await,
+            AnyProvider::Local(p) => p.chat_stream(request).await,
         }
     }
 }
@@ -86,6 +92,9 @@ impl ProviderArgs {
                     Some(u) => p.with_base_url(u),
                     None => p,
                 })
+            }
+            ProviderKind::Local => {
+                AnyProvider::Local(Box::new(harpia::local::TextGenerator::load(std::path::Path::new(&self.model))?))
             }
             ProviderKind::Ollama => AnyProvider::Ollama(Ollama::new(
                 http,

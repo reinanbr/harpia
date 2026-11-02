@@ -30,6 +30,34 @@ environment variables, so CI never needs the reference stack or large downloads.
 errei's model weights (`treino/modelos/errei-cita-v1`, CC BY-NC 2.0) and datasets are read in
 place from `HARPIA_ERREI_DIR` and are never copied into this repository.
 
+## Results
+
+| suite | reference | result |
+|---|---|---|
+| errei-cita-v1 (XLM-R cross-encoder, `crates/harpia-local/tests/parity_errei.rs`) | transformers 5.22.1, torch 2.15.0+cpu, f32, `max_length=192`, longest-first; 50 pairs from `pares_val.jsonl` (every 22nd line) | max \|Δlogit\| = 1.03e-5 (tolerance 1e-4); argmax 50/50; token ids identical on the 5 checked pairs |
+
+The golden file stores line numbers and logits only; texts are read from `HARPIA_ERREI_DIR`.
+It was produced with this script, run once with errei's own virtual environment (kept here as
+documentation, not as a file in the repository):
+
+```python
+import json, sys, torch, transformers
+from transformers import AutoTokenizer, AutoModelForSequenceClassification
+errei, out = sys.argv[1], sys.argv[2]
+d = f"{errei}/treino/modelos/errei-cita-v1"
+rows = [json.loads(l) for l in open(f"{errei}/treino/dados/pares_val.jsonl", encoding="utf-8")]
+lines = list(range(0, len(rows), max(1, len(rows) // 50)))[:50]
+tok = AutoTokenizer.from_pretrained(d); model = AutoModelForSequenceClassification.from_pretrained(d).eval()
+items = []
+with torch.no_grad():
+    for i in lines:
+        enc = tok(rows[i]["b"], rows[i]["a"], truncation=True, max_length=192, return_tensors="pt")
+        items.append({"line": i + 1, "input_ids": enc["input_ids"][0].tolist() if len(items) < 5 else None,
+                      "logits": model(**enc).logits[0].tolist()})
+json.dump({"labels": [model.config.id2label[i] for i in range(model.config.num_labels)],
+           "tolerance": 1e-4, "items": items}, open(out, "w"), indent=1)
+```
+
 ## Already covered without golden files
 
 - `harpia_text::stats::flesch` uses the published coefficients (Martins et al., 1996; Flesch,

@@ -18,7 +18,7 @@ members = [
 [workspace.package]
 version = "0.1.0"
 edition = "2024"
-rust-version = "1.90"
+rust-version = "1.94"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/harpia-rs/harpia"
 homepage = "https://github.com/harpia-rs/harpia"
@@ -71,6 +71,9 @@ sha2 = "0.11"
 httpdate = "1.0"
 tracing = "0.1"
 wiremock = "0.6"
+candle-core = { version = "0.11", default-features = false }
+candle-nn = { version = "0.11", default-features = false }
+candle-transformers = { version = "0.11", default-features = false }
 
 # dev
 proptest = "1.6"

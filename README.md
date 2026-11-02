@@ -41,7 +41,7 @@ Harpia covers the full lifecycle of **data and large language models**:
 | `harpia-client` | OpenAI-compatible, Anthropic and Ollama providers with streaming and tool calls; structured output with validation and retries; middleware; RPM/TPM batch runner; synthetic data generation | **stable** |
 | `harpia` | umbrella crate re-exporting the above | **stable** |
 | `harpia-cli` | the `harpia` binary | **stable** (text, data and LLM commands) |
-| `harpia-local` | candle inference: decoders, encoders, rerankers, MarianMT | planned (milestone 3) |
+| `harpia-local` | candle inference: sequence/pair classifiers and rerankers (BERT, RoBERTa, XLM-R; parity with transformers 1e-5), embeddings, Qwen2/Llama generation with constrained decoding and log-probs, MarianMT (experimental) | **stable** |
 | `harpia-train` | LoRA SFT, DPO, encoder and embedding fine-tuning | planned (milestone 4) |
 | `harpia-eval` | eval harness, judges, RAG metrics, calibration, model cards | planned (milestone 5) |
 | `harpia-verify` | grounding against trusted sources | planned (milestone 6) |
@@ -108,6 +108,9 @@ harpia repair-json model_output.txt
 harpia chat --provider anthropic --model claude-opus-5-5 --online "Explain sequence packing in two sentences"
 harpia chat --provider ollama --model llama3.2 --online --stream "Olá!"
 harpia chat --provider openai --base-url http://localhost:8000/v1 --model qwen2.5 --online "hi"   # vLLM / llama.cpp
+harpia classify --model models/nli pairs.jsonl --premise evidence --hypothesis claim --thresholds t.json -o scored.jsonl
+harpia generate --model models/qwen2.5-0.5b-instruct --chat --schema answer.json "Is the sky blue?"
+harpia chat --provider local --model models/qwen2.5-0.5b-instruct "Olá!"
 harpia data synth topics.jsonl --provider anthropic --model claude-opus-5-5 --template qa.toml --online -o qa.jsonl
 ```
 
@@ -131,14 +134,16 @@ environment error.
 | `schema` | no | JSON Schema validation (`jsonschema`) and derivation (`schemars`) | no |
 | `http` | no | `harpia::http` (polite HTTP, `http://` only without `tls`) | no |
 | `client` | no | `harpia::client` (OpenAI-compatible, Anthropic, Ollama, batch runner, synthesis) | no |
+| `local` | no | `harpia::local` (candle, CPU) | no |
 | `full` | no | all of the above | no |
+| `cuda` | no | NVIDIA GPU inference | **yes** (CUDA toolkit) |
+| `metal` | no | Apple GPU inference | **yes** (Metal) |
 | `tls` | no | HTTPS for `http`/`client` via rustls + `ring` | **yes** (`ring`: C/assembly) |
 
 The `harpia-cli` binary enables `tls` by default; `cargo install harpia-cli --no-default-features`
 builds a pure-Rust binary for local `http://` servers.
 
-GPU backends (`cuda`, `metal`) and accelerated BLAS (`mkl`, `accelerate`) will arrive with
-`harpia-local` as opt-in features that pull native code; they will be labeled as such here.
+See [`docs/models.md`](docs/models.md) for supported architectures, verification status and limits.
 
 ## Replacing a Python stack
 
@@ -148,10 +153,12 @@ GPU backends (`cuda`, `metal`) and accelerated BLAS (`mkl`, `accelerate`) will a
 | `transformers` `apply_chat_template` + assistant masks | `harpia-data::template` | available |
 | `trl` packing | `harpia-data::pack` | available |
 | `json_repair`, `partial-json-parser` | `harpia-structured` | available |
-| `outlines` / `guidance` (constrained decoding) | `harpia-structured::constraint` (+ `harpia-local`) | constraints available; decoding loop planned |
+| `outlines` / `guidance` (constrained decoding) | `harpia-structured::constraint` + `harpia-local` | available |
 | `rapidfuzz` | `harpia-text::fuzzy` | available |
 | `langchain` text splitters | `harpia-data::chunk` | available |
-| `transformers` inference, `sentence-transformers` | `harpia-local` | planned |
+| `transformers` sequence classification, cross-encoders, `sentence-transformers` embeddings | `harpia-local` | available (XLM-R verified against transformers) |
+| `transformers` text generation + `outlines` constrained decoding | `harpia-local::TextGenerator` | available for Qwen2/Llama (not yet verified on a real checkpoint) |
+| `transformers` MarianMT | `harpia-local::MarianTranslator` | experimental |
 | `peft` / `trl` training | `harpia-train` | planned |
 | `lm-eval-harness` / `ragas` | `harpia-eval` | planned |
 | `httpx` + sqlite cache, `tenacity` retries | `harpia-http` | available |
@@ -180,8 +187,9 @@ reference checking) are mapped to Harpia APIs in `docs/errei-mapping.md`.
 1. **core + text + data + structured**: done in 0.1.
 2. **http + client**: done: polite HTTP layer, providers, structured output, batch runner,
    synthetic data generation.
-3. **local**: decoders with chat templates, constrained decoding and log-probs; encoders
-   (classifiers, embeddings, rerankers); MarianMT.
+3. **local**: done: encoders (classifiers, rerankers, embeddings), Qwen2/Llama decoders with chat
+   templates, constrained decoding and log-probs, MarianMT (experimental). Still to come: GGUF
+   quantized models, LoRA adapter loading (with train), Hub downloads.
 4. **train**: LoRA SFT with PEFT-compatible export, encoder and embedding fine-tuning, then
    DPO/QLoRA.
 5. **eval**: harness, judges, RAG metrics, calibration, model cards; RAG retrieval in
@@ -202,8 +210,8 @@ commit stated. Raw Harpia-only numbers and the comparison protocol are in
 
 ## MSRV
 
-Rust **1.90** (required by `redb`; verified by building the whole workspace, all targets and all
-features, with the 1.90 toolchain). Raising it is a minor-version change.
+Rust **1.94** (required by `candle-core` 0.11, which fails on 1.93; verified by building the whole
+workspace, all targets, with `harpia/full,harpia/tls` on the 1.94 toolchain). Raising it is a minor-version change.
 
 ## Contributing
 

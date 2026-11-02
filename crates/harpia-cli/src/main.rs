@@ -4,6 +4,7 @@
 
 mod data_cmd;
 mod llm_cmd;
+mod local_cmd;
 mod text_cmd;
 mod util;
 
@@ -29,6 +30,8 @@ const EXAMPLES: &str = "Examples:
   harpia chunk doc.md --strategy markdown --size 1200
   harpia repair-json broken.json
   harpia chat --provider anthropic --model claude-opus-5-5 --online 'Summarize RAG in one line'
+  harpia generate --model models/qwen2.5-0.5b-instruct --chat --schema answer.json 'Is the sky blue?'
+  harpia classify --model models/nli pairs.jsonl --premise evidence --hypothesis claim -o scored.jsonl
   harpia data synth topics.jsonl --provider ollama --model llama3.2 --template qa.toml --online -o qa.jsonl
   harpia data filter raw.jsonl --preset gopher-like -o clean.jsonl --report report.json
   harpia data pack chat.jsonl --tokenizer tokenizer.json --template chatml --seq-len 2048 -o packed.jsonl
@@ -49,8 +52,16 @@ enum Command {
     CountTokens(text_cmd::CountTokensArgs),
     /// Extract and repair JSON from LLM output.
     RepairJson(text_cmd::RepairArgs),
-    /// Chat with an LLM provider (OpenAI-compatible, Anthropic, Ollama). Needs --online.
+    /// Chat with an LLM provider (OpenAI-compatible, Anthropic, Ollama need --online; `local` runs a model directory).
     Chat(llm_cmd::ChatArgs),
+    /// Generate text with a local decoder model, optionally constrained (JSON Schema, regex, choices).
+    Generate(local_cmd::GenerateArgs),
+    /// Classify texts or (premise, hypothesis) pairs with a local encoder model.
+    Classify(local_cmd::ClassifyArgs),
+    /// Translate a JSONL field with a local MarianMT model (resumable cache).
+    Translate(local_cmd::TranslateArgs),
+    /// Add sentence embeddings to JSONL rows with a local encoder model.
+    Embed(local_cmd::EmbedArgs),
     /// Dataset tools (inspect, convert, filter, pii, dedup, decontaminate, split, template, pack).
     #[command(subcommand)]
     Data(data_cmd::DataCommand),
@@ -66,6 +77,10 @@ fn main() -> ExitCode {
         Command::CountTokens(a) => text_cmd::count_tokens(a, cli.format),
         Command::RepairJson(a) => text_cmd::repair_json(a, cli.format),
         Command::Chat(a) => llm_cmd::chat(a, cli.format),
+        Command::Generate(a) => local_cmd::generate(a, cli.format),
+        Command::Classify(a) => local_cmd::classify(a, cli.format),
+        Command::Translate(a) => local_cmd::translate(a, cli.format),
+        Command::Embed(a) => local_cmd::embed(a, cli.format),
         Command::Data(c) => data_cmd::run(c, cli.format),
     };
     match result {

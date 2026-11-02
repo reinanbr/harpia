@@ -1,7 +1,7 @@
 [package]
 name = "harpia-local"
-description = "Pure-Rust local inference with candle: decoder LLMs, encoders, rerankers and seq2seq models."
-keywords = ["llm", "nlp", "machine-learning", "ai", "dataset"]
+description = "Pure-Rust local inference with candle: encoders (sequence/pair classifiers, embeddings, rerankers), MarianMT translation and decoder LLMs."
+keywords = ["llm", "inference", "candle", "transformers", "nlp"]
 categories = ["science", "text-processing"]
 version.workspace = true
 edition.workspace = true
@@ -14,6 +14,28 @@ readme = "README.md"
 
 [dependencies]
 harpia-core = { workspace = true }
+harpia-data = { workspace = true, features = ["tokenizers"] }
+harpia-structured = { workspace = true }
+candle-core = { workspace = true }
+candle-nn = { workspace = true }
+candle-transformers = { workspace = true }
+tokenizers = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+rayon = { workspace = true }
+futures-core = { workspace = true }
+
+[features]
+default = []
+## NVIDIA GPUs (native code: CUDA toolkit).
+cuda = ["candle-core/cuda", "candle-nn/cuda", "candle-transformers/cuda"]
+## Apple GPUs (native code: Metal).
+metal = ["candle-core/metal", "candle-nn/metal", "candle-transformers/metal"]
+
+[dev-dependencies]
+tempfile = { workspace = true }
+tokio = { workspace = true, features = ["rt"] }
+serde_json = { workspace = true }
 
 [lints]
 workspace = true

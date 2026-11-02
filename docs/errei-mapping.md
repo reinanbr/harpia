@@ -23,10 +23,10 @@ Status legend: **done** (in 0.1), **planned (Mn)** (milestone n), **gap** (not y
 | `net/cache.py` | SQLite TTL cache | `harpia_http::CacheConfig` (`redb`, `mailto` excluded from keys by default) | done |
 | `net/sources.py` | Crossref, OpenAlex, Semantic Scholar, arXiv adapters | `harpia-verify` adapters | planned (M6) |
 | `checkers/refs.py` reference matching | fuzzy title/author/year match → confirmed/divergent/not found, retractions | `harpia-verify` reference verification | planned (M6) |
-| `citecheck.py` `Classificador` | XLM-RoBERTa pair classification, label aliases, length-limited batches, load once per process | `harpia-local` `AutoSequenceClassifier` + `PairClassifier` | planned (M3) |
+| `citecheck.py` `Classificador` | XLM-RoBERTa pair classification, label aliases, length-limited batches, load once per process | `harpia_local::{SequenceClassifier::load_with(dir, cpu, f32, 192), ModelCache}` + `PairClassifier`; parity with transformers 1.0e-5 | done |
 | `citecheck.py` `julgar_resumo` | sentence + 2-sentence windows, max per label with evidence | `harpia-eval` "best of N windows" | planned (M5) |
 | `citecheck.py` thresholds file | calibrated per-label thresholds | `harpia-eval` calibration | planned (M5) |
-| `treino/traduzir.py` | MarianMT batched translation, resumable cache | `harpia-local` MarianMT + `harpia_data::JsonlCache` | cache done; MarianMT planned (M3) |
+| `treino/traduzir.py` | MarianMT batched translation, resumable cache | `harpia_local::MarianTranslator` + `JsonlCache`; `harpia translate --cache` | experimental: needs a `tokenizer.json` export of the SentencePiece tokenizer; not yet verified on opus-mt-tc-big-en-pt |
 | `treino/preparar.py`, `comum.py` | JSONL IO, seeded splits | `harpia_data::{read_jsonl, JsonlWriter}`, `split::{random_split, group_split}`, `rng::SplitMix64` | done |
 | `treino/treinar.py` | cross-encoder fine-tuning: AdamW, warmup/linear decay, clipping, class weights, macro-F1 per epoch, best checkpoint | `harpia-train`; class weights: `harpia_data::split::class_weights` | weights done; training planned (M4) |
 | `treino/avaliar.py`, `finalizar.py` | per-class P/R/F1, macro F1, threshold grid search on val, frozen test, baseline, model card | `harpia-eval` | planned (M5) |

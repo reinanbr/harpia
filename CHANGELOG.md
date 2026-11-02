@@ -22,10 +22,19 @@ All notable changes to this project are documented here. The format follows
   provenance.
 - CLI: `harpia chat` and `harpia data synth` (both require `--online`).
 - Umbrella features `http`, `client` and `tls`.
+- `harpia-local`: candle-based `SequenceClassifier` (BERT/RoBERTa/XLM-R, pairs, label aliases,
+  length-sorted batching, `PairClassifier` + `Reranker`), `EncoderEmbedder`, `TextGenerator`
+  (Qwen2/Llama: KV cache, sampling, stop sequences, constrained decoding, log-probs,
+  log-likelihood, chat templates, `Model` + `Provider`), experimental `MarianTranslator`,
+  `ModelCache`, and `testing` helpers that write tiny random-weight models. Parity with
+  transformers on errei-cita-v1: max |Δlogit| 1.0e-5.
+- CLI: `classify`, `generate`, `translate`, `embed`, and `chat --provider local`.
+- Umbrella features `local`, `cuda`, `metal` (the last two pull native code).
 
 ### Changed
 
-- MSRV raised to 1.90 (required by `redb` 4).
+- MSRV raised to 1.94: `redb` 4 needs 1.90 and `candle-core` 0.11 needs 1.94 (measured: it fails
+  to build on 1.93).
 - `harpia-data` and `harpia-http` are workspace dependencies without default features; enable
   `langid` / `tls` explicitly.
 - HTTPS (`tls` feature) uses rustls + `ring`, which contains C/assembly: the only opt-in

@@ -25,7 +25,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with: { components: clippy }
       - uses: Swatinem/rust-cache@v2
-      - run: cargo clippy --workspace --all-targets --all-features -- -D warnings
+      - run: cargo clippy --workspace --all-targets --features harpia/full,harpia/tls -- -D warnings
 
   test:
     strategy:
@@ -37,7 +37,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
-      - run: cargo test --workspace --all-features
+      - run: cargo test --workspace --features harpia/full,harpia/tls
       - run: cargo test --workspace
 
   features:
@@ -47,15 +47,15 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - uses: taiki-e/install-action@cargo-hack
-      - run: cargo hack check --workspace --each-feature --no-dev-deps
+      - run: cargo hack check --workspace --each-feature --no-dev-deps --exclude-features cuda,metal
 
   msrv:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@1.90
+      - uses: dtolnay/rust-toolchain@1.94
       - uses: Swatinem/rust-cache@v2
-      - run: cargo check --workspace --all-features --all-targets
+      - run: cargo check --workspace --features harpia/full,harpia/tls --all-targets
 
   pure-rust:
     name: no C toolchain
@@ -67,7 +67,7 @@ jobs:
       - run: CC=false CXX=false cargo build -p harpia-cli --no-default-features
       - name: no -sys crates in the dependency graph
         run: |
-          if cargo tree -p harpia --features full -e normal,build --prefix none | grep -E -- '-sys v|^ring v|^cc v'; then
+          if cargo tree -p harpia --features full -e normal,build --prefix none | grep -E -- '-sys v|^ring v|^cc v' | grep -v '^linux-raw-sys v'; then
             echo "native dependency found" && exit 1
           fi
 
@@ -85,7 +85,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
-      - run: cargo doc --workspace --all-features --no-deps
+      - run: cargo doc --workspace --features harpia/full,harpia/tls --no-deps
 
   bench-check:
     runs-on: ubuntu-latest

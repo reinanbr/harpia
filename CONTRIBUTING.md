@@ -22,8 +22,8 @@ Thanks for helping! A few rules keep the project healthy:
 
 ```bash
 cargo fmt --all --check
-cargo clippy --workspace --all-targets --all-features -- -D warnings
-cargo test --workspace --all-features
+cargo clippy --workspace --all-targets --features harpia/full,harpia/tls -- -D warnings
+cargo test --workspace --features harpia/full,harpia/tls   # cuda/metal need their toolkits
 cargo build --workspace --no-default-features
 cargo deny check            # licenses, advisories, bans
 ```

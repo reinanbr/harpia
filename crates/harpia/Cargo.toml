@@ -32,8 +32,14 @@ http = ["dep:harpia-http"]
 client = ["http", "data", "structured", "dep:harpia-client", "harpia-client?/openai-compatible", "harpia-client?/anthropic", "harpia-client?/ollama"]
 ## HTTPS via rustls + `ring`. NOTE: `ring` contains C/assembly and needs a C compiler.
 tls = ["http", "harpia-http?/tls", "harpia-client?/tls"]
+## Local inference with candle (encoders, MarianMT, Qwen2/Llama decoders). Pure Rust on CPU.
+local = ["data", "structured", "tokenizers", "dep:harpia-local"]
+## NVIDIA GPU inference (native code: CUDA).
+cuda = ["local", "harpia-local?/cuda"]
+## Apple GPU inference (native code: Metal).
+metal = ["local", "harpia-local?/metal"]
 ## Everything implemented so far, in pure Rust (add `tls` for HTTPS).
-full = ["text", "data", "structured", "langid", "tokenizers", "schema", "http", "client"]
+full = ["text", "data", "structured", "langid", "tokenizers", "schema", "http", "client", "local"]
 
 [dependencies]
 harpia-core = { workspace = true }
@@ -42,6 +48,7 @@ harpia-data = { workspace = true, optional = true }
 harpia-structured = { workspace = true, optional = true }
 harpia-http = { workspace = true, optional = true }
 harpia-client = { workspace = true, optional = true }
+harpia-local = { workspace = true, optional = true }
 
 [dev-dependencies]
 serde = { workspace = true }

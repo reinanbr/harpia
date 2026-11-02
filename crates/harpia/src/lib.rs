@@ -11,7 +11,8 @@
 //! | `structured` | `harpia-structured` | `structured` (default) | stable |
 //! | `http` | `harpia-http` | `http` (+ `tls` for HTTPS) | stable |
 //! | `client` | `harpia-client` | `client` | stable |
-//! | — | `harpia-local`, `harpia-train`, `harpia-eval`, `harpia-verify` | — | planned |
+//! | `local` | `harpia-local` | `local` (+ `cuda`/`metal`) | stable (MarianMT experimental) |
+//! | — | `harpia-train`, `harpia-eval`, `harpia-verify` | — | planned |
 //!
 //! ```
 //! # #[cfg(all(feature = "data", feature = "structured"))] {
@@ -35,6 +36,8 @@ pub use harpia_core as core;
 pub use harpia_data as data;
 #[cfg(feature = "http")]
 pub use harpia_http as http;
+#[cfg(feature = "local")]
+pub use harpia_local as local;
 #[cfg(feature = "structured")]
 pub use harpia_structured as structured;
 #[cfg(feature = "text")]
