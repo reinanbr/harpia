@@ -166,3 +166,30 @@ fn marian_greedy_and_beam() {
     let b = mt.translate(&["the harpy eagle eats sloths", "hello world"]).unwrap();
     assert_eq!(b.len(), 2);
 }
+
+/// Real `opus-mt-*` checkpoint straight from the Hugging Face cache (`source.spm` +
+/// `vocab.json`, no `tokenizer.json`). Run with
+/// `HARPIA_MARIAN_DIR=<snapshot dir> cargo test -p harpia-local -- --ignored marian_spm`.
+#[test]
+#[ignore = "needs a downloaded opus-mt checkpoint"]
+fn marian_spm_real_model() {
+    let Ok(dir) = std::env::var("HARPIA_MARIAN_DIR") else { return };
+    let mut mt = MarianTranslator::load(std::path::Path::new(&dir)).unwrap();
+    mt.prefix = Some(">>por<<".into());
+    let out =
+        mt.translate(&["The harpy eagle is the largest raptor in the Americas.", "I like to read books."]).unwrap();
+    eprintln!("{out:?}");
+    assert!(out[0].to_lowercase().contains("harpia"), "{out:?}");
+    assert!(out[1].to_lowercase().contains("livros"), "{out:?}");
+
+    // Golden file from transformers (`docs/parity.md`): token ids and greedy translations.
+    let Ok(golden) = std::env::var("HARPIA_MARIAN_REF") else { return };
+    let rows: Vec<serde_json::Value> = serde_json::from_str(&std::fs::read_to_string(golden).unwrap()).unwrap();
+    for row in &rows {
+        let text = row["text"].as_str().unwrap();
+        let want: Vec<u32> = serde_json::from_value(row["ids"].clone()).unwrap();
+        assert_eq!(mt.encode_source(text).unwrap(), want, "ids for {text:?}");
+        assert_eq!(mt.translate_one(text).unwrap(), row["translation"].as_str().unwrap(), "translation of {text:?}");
+    }
+    eprintln!("{} rows match transformers", rows.len());
+}

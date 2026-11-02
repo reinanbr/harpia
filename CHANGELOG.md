@@ -8,6 +8,11 @@ All notable changes to this project are documented here. The format follows
 
 ### Added (pending-items pass)
 
+- `harpia_data::spm`: SentencePiece `ModelProto` reader (pure Rust protobuf) that builds a Unigram
+  tokenizer with the model's precompiled normalization map. `MarianTranslator` uses it to load
+  `source.spm` + `vocab.json` straight from a Hub snapshot like `MarianTokenizer`; token ids and
+  greedy translations match transformers on `opus-mt-tc-big-en-pt`. MarianMT is now stable.
+
 - `harpia-http::HttpClient::download_to_file` (streaming, atomic, capped); `harpia-local` feature
   `hub` (`Hub::snapshot`) and `harpia download <repo> --online`.
 - Parity with transformers on a real decoder (Qwen2.5-0.5B-Instruct): template, tokens, logits,

@@ -37,6 +37,8 @@ pub mod pii;
 pub mod rng;
 pub mod shard;
 pub mod split;
+#[cfg(feature = "tokenizers")]
+pub mod spm;
 pub mod template;
 #[cfg(feature = "tokenizers")]
 pub mod tokenize;

@@ -38,6 +38,7 @@ place from `HARPIA_ERREI_DIR` and are never copied into this repository.
 | Qwen2.5-0.5B-Instruct (`crates/harpia-local/tests/parity_qwen.rs`, `HARPIA_QWEN_DIR`) | transformers 5.22.1, f32 | chat template string and token ids identical; max \|Δlogit\| 4.29e-4 over the top-50 logits of 33 positions (tolerance 1e-3); 20 greedy tokens identical to `generate()` with the model's `repetition_penalty` 1.1 |
 | LoRA export (Qwen2.5-0.5B, adapter trained by `harpia train sft`) | the PEFT merge formula `W += alpha/r · B·A` applied in transformers from `adapter_model.safetensors` | 12 greedy tokens identical to Harpia's merged model, max \|Δlogprob\| 3.1e-4 (PEFT itself was not installed, so the adapter was not loaded through `peft`) |
 | Classifier checkpoint written by `harpia train classifier` | loaded with `AutoModelForSequenceClassification` | probabilities identical to 6 decimals |
+| MarianMT `Helsinki-NLP/opus-mt-tc-big-en-pt` from the raw Hub snapshot (`source.spm` + `vocab.json`; test `marian_spm_real_model`, `HARPIA_MARIAN_DIR` + `HARPIA_MARIAN_REF`) | transformers 5.22.1 `MarianTokenizer` (sentencepiece) and `generate(num_beams=1)`, f32 | source token ids and greedy translations identical on 8 sentences (accents, NFKC full-width and circled forms, extra and trailing spaces, CJK and emoji) |
 
 The golden file stores line numbers and logits only; texts are read from `HARPIA_ERREI_DIR`.
 It was produced with this script, run once with errei's own virtual environment (kept here as
@@ -59,6 +60,26 @@ with torch.no_grad():
                       "logits": model(**enc).logits[0].tolist()})
 json.dump({"labels": [model.config.id2label[i] for i in range(model.config.num_labels)],
            "tolerance": 1e-4, "items": items}, open(out, "w"), indent=1)
+```
+
+The MarianMT golden file was produced with this script (documentation only):
+
+```python
+import json, sys, torch
+from transformers import MarianTokenizer, MarianMTModel
+name = "Helsinki-NLP/opus-mt-tc-big-en-pt"
+tok = MarianTokenizer.from_pretrained(name); model = MarianMTModel.from_pretrained(name).eval()
+texts = ["The harpy eagle is the largest raptor in the Americas.", "I like to read books.",
+         "Hello,   world!  Café naïve ½ “quotes” — dash…", "ＦＵＬＬＷＩＤＴＨ text and ① circled, tab\there.",
+         "Numbers: 3.14, 1,000,000 and 42%; e-mail a@b.com", "Ünïcödé façade, coöperate, résumé.",
+         "  leading and trailing spaces  ", "日本語 and emoji 🦅 mixed in."]
+out = []
+for t in texts:
+    src = ">>por<< " + t
+    with torch.no_grad():
+        gen = model.generate(**tok([src], return_tensors="pt"), num_beams=1, do_sample=False, max_new_tokens=128)
+    out.append({"text": t, "ids": tok(src).input_ids, "translation": tok.decode(gen[0], skip_special_tokens=True)})
+json.dump(out, open(sys.argv[1], "w"), ensure_ascii=False, indent=1)
 ```
 
 ## Already covered without golden files

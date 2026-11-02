@@ -41,7 +41,7 @@ Harpia covers the full lifecycle of **data and large language models**:
 | `harpia-client` | OpenAI-compatible, Anthropic and Ollama providers with streaming and tool calls; structured output with validation and retries; middleware; RPM/TPM batch runner; synthetic data generation | **stable** |
 | `harpia` | umbrella crate re-exporting the above | **stable** |
 | `harpia-cli` | the `harpia` binary | **stable** (text, data and LLM commands) |
-| `harpia-local` | candle inference: sequence/pair classifiers and rerankers (BERT, RoBERTa, XLM-R; parity with transformers 1e-5), embeddings, Qwen2/Llama generation with constrained decoding and log-probs, MarianMT (experimental) | **stable** |
+| `harpia-local` | candle inference: sequence/pair classifiers and rerankers (BERT, RoBERTa, XLM-R; parity with transformers 1e-5), embeddings, Qwen2/Llama generation with constrained decoding and log-probs, MarianMT straight from Hub SentencePiece files (parity with transformers) | **stable** |
 | `harpia-train` | classifier / cross-encoder fine-tuning (verified on a real XLM-R model; checkpoints load in transformers), LoRA SFT with PEFT export, DPO (experimental) | **stable** |
 | `harpia-eval` | eval harness, judges, RAG metrics, calibration, model cards | planned (milestone 5) |
 | `harpia-verify` | grounding against trusted sources | planned (milestone 6) |
@@ -161,7 +161,7 @@ See [`docs/models.md`](docs/models.md) for supported architectures, verification
 | `langchain` text splitters | `harpia-data::chunk` | available |
 | `transformers` sequence classification, cross-encoders, `sentence-transformers` embeddings | `harpia-local` | available (XLM-R verified against transformers) |
 | `transformers` text generation + `outlines` constrained decoding | `harpia-local::TextGenerator` | available (Qwen2.5 verified against transformers; ~2.8× faster than `generate()` on CPU) |
-| `transformers` MarianMT | `harpia-local::MarianTranslator` | experimental |
+| `transformers` MarianMT | `harpia-local::MarianTranslator` | stable |
 | `transformers` Trainer for sequence classification | `harpia-train::train_classifier` | available (about 1.7× slower than PyTorch on CPU, see benchmarks) |
 | `peft` LoRA SFT, `trl` DPO | `harpia-train::{train_lora_sft, train_lora_dpo}` | available (verified on Qwen2.5-0.5B; DPO experimental) |
 | `huggingface_hub` snapshot downloads | `harpia-local::hub`, `harpia download` | available |
@@ -193,7 +193,7 @@ reference checking) are mapped to Harpia APIs in `docs/errei-mapping.md`.
 2. **http + client**: done: polite HTTP layer, providers, structured output, batch runner,
    synthetic data generation.
 3. **local**: done: encoders (classifiers, rerankers, embeddings), Qwen2/Llama decoders with chat
-   templates, constrained decoding and log-probs, MarianMT (experimental). Still to come: GGUF
+   templates, constrained decoding and log-probs, MarianMT. Still to come: GGUF
    quantized models, LoRA adapter loading (with train), Hub downloads.
 4. **train**: done: classifier fine-tuning, LoRA SFT with PEFT export, DPO (experimental). Still
    to come: embedding fine-tuning, QLoRA, optimizer-state checkpoints.

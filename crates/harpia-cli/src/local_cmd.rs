@@ -97,7 +97,7 @@ pub fn classify(a: ClassifyArgs, format: OutputFormat) -> Result<ExitCode> {
 
 #[derive(Args)]
 pub struct TranslateArgs {
-    /// MarianMT model directory (needs `tokenizer.json`).
+    /// MarianMT model directory (`source.spm` + `vocab.json`, or `tokenizer.json`).
     #[arg(long)]
     pub model: String,
     /// JSONL input (`-` for stdin).
