@@ -286,3 +286,95 @@ fn train_classifier_and_lora_sft_end_to_end() {
         .stdout(predicate::str::contains("3 steps"));
     assert!(adapter.join("adapter_config.json").exists());
 }
+
+#[test]
+fn calibrate_fits_on_val_and_refuses_leaked_test() {
+    let dir = tempfile::tempdir().unwrap();
+    let val = dir.path().join("val.jsonl");
+    let test = dir.path().join("test.jsonl");
+    fs::write(
+        &val,
+        r#"{"scores":{"entailment":0.9,"contradiction":0.05,"neutral":0.05},"label":"entailment"}
+{"scores":{"entailment":0.2,"contradiction":0.7,"neutral":0.1},"label":"contradiction"}
+{"scores":{"entailment":0.3,"contradiction":0.2,"neutral":0.5},"label":"neutral"}
+"#,
+    )
+    .unwrap();
+    fs::write(
+        &test,
+        r#"{"scores":{"entailment":0.8,"contradiction":0.1,"neutral":0.1},"label":"entailment"}
+{"scores":{"entailment":0.1,"contradiction":0.8,"neutral":0.1},"label":"contradiction"}
+"#,
+    )
+    .unwrap();
+    let th = dir.path().join("th.json");
+    let out = harpia()
+        .args(["calibrate", "--format", "json", "--val"])
+        .arg(&val)
+        .arg("--test")
+        .arg(&test)
+        .arg("-o")
+        .arg(&th)
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let v: serde_json::Value = serde_json::from_slice(&out).unwrap();
+    assert_eq!(v["calibration"]["validation_n"], 3);
+    assert!(v["test"].is_object());
+    assert!(th.exists());
+    // the test set must never be the validation set
+    harpia().args(["calibrate", "--val"]).arg(&val).arg("--test").arg(&val).assert().code(2);
+}
+
+#[test]
+fn eval_rag_retrieval_metrics() {
+    let dir = tempfile::tempdir().unwrap();
+    let rag = dir.path().join("rag.jsonl");
+    fs::write(
+        &rag,
+        r#"{"question":"q1","retrieved":["a","b","c"],"relevant":["b"]}
+{"question":"q2","retrieved":["x","y"],"relevant":["x","z"]}
+"#,
+    )
+    .unwrap();
+    let out = harpia()
+        .args(["eval", "rag", "--k", "2", "--format", "json"])
+        .arg(&rag)
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let v: serde_json::Value = serde_json::from_slice(&out).unwrap();
+    assert_eq!(v["retrieval"]["n"], 2);
+    assert!((v["retrieval"]["recall"].as_f64().unwrap() - 0.75).abs() < 1e-9);
+    assert!((v["retrieval"]["precision"].as_f64().unwrap() - 0.5).abs() < 1e-9);
+    assert!(v["faithfulness"].is_null());
+}
+
+#[test]
+fn eval_compare_builds_leaderboard() {
+    let dir = tempfile::tempdir().unwrap();
+    let a = dir.path().join("a.json");
+    let b = dir.path().join("b.json");
+    fs::write(&a, r#"{"schema":1,"model":"alpha","results":{"qa":{"exact_match":0.5}},"n":{"qa":10}}"#).unwrap();
+    fs::write(&b, r#"{"schema":1,"model":"beta","results":{"qa":{"exact_match":0.7}},"n":{"qa":10}}"#).unwrap();
+    harpia()
+        .args(["eval", "compare"])
+        .arg(&a)
+        .arg(&b)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("alpha").and(predicate::str::contains("beta")));
+}
+
+#[test]
+fn eval_run_rejects_bad_threshold_spec() {
+    harpia()
+        .args(["eval", "run", "--task", "t.toml", "--provider", "ollama", "--model", "m", "--min", "nonsense"])
+        .assert()
+        .code(2)
+        .stderr(predicate::str::contains("task/metric=value"));
+}

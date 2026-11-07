@@ -104,7 +104,7 @@ impl ProviderArgs {
     }
 }
 
-fn runtime() -> Result<tokio::runtime::Runtime> {
+pub fn runtime() -> Result<tokio::runtime::Runtime> {
     tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()

@@ -15,6 +15,7 @@
 //! | `train` | `harpia-train` | `train` | stable (DPO experimental) |
 //! | `eval` | `harpia-eval` | `eval` | stable |
 //! | `verify` | `harpia-verify` | `verify` (+ `verify-*` adapters, `verify-llm`) | stable |
+//! | `publish` | `harpia-pub` | `pub` | stable |
 //!
 //! ```
 //! # #[cfg(all(feature = "data", feature = "structured"))] {
@@ -42,6 +43,8 @@ pub use harpia_eval as eval;
 pub use harpia_http as http;
 #[cfg(feature = "local")]
 pub use harpia_local as local;
+#[cfg(feature = "pub")]
+pub use harpia_pub as publish;
 #[cfg(feature = "structured")]
 pub use harpia_structured as structured;
 #[cfg(feature = "text")]

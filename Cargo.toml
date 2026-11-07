@@ -11,12 +11,13 @@ members = [
     "crates/harpia-train",
     "crates/harpia-eval",
     "crates/harpia-verify",
+    "crates/harpia-pub",
     "crates/harpia",
     "crates/harpia-cli",
 ]
 
 [workspace.package]
-version = "0.1.0"
+version = "0.2.0"
 edition = "2024"
 rust-version = "1.94"
 license = "MIT OR Apache-2.0"
@@ -27,17 +28,18 @@ readme = "README.md"
 
 [workspace.dependencies]
 # internal
-harpia-core = { path = "crates/harpia-core", version = "0.1.0" }
-harpia-text = { path = "crates/harpia-text", version = "0.1.0" }
-harpia-data = { path = "crates/harpia-data", version = "0.1.0", default-features = false }
-harpia-structured = { path = "crates/harpia-structured", version = "0.1.0" }
-harpia-http = { path = "crates/harpia-http", version = "0.1.0", default-features = false }
-harpia-client = { path = "crates/harpia-client", version = "0.1.0", default-features = false }
-harpia-local = { path = "crates/harpia-local", version = "0.1.0" }
-harpia-train = { path = "crates/harpia-train", version = "0.1.0" }
-harpia-eval = { path = "crates/harpia-eval", version = "0.1.0" }
-harpia-verify = { path = "crates/harpia-verify", version = "0.1.0", default-features = false }
-harpia = { path = "crates/harpia", version = "0.1.0" }
+harpia-core = { path = "crates/harpia-core", version = "0.2.0" }
+harpia-text = { path = "crates/harpia-text", version = "0.2.0" }
+harpia-data = { path = "crates/harpia-data", version = "0.2.0", default-features = false }
+harpia-structured = { path = "crates/harpia-structured", version = "0.2.0" }
+harpia-http = { path = "crates/harpia-http", version = "0.2.0", default-features = false }
+harpia-client = { path = "crates/harpia-client", version = "0.2.0", default-features = false }
+harpia-local = { path = "crates/harpia-local", version = "0.2.0" }
+harpia-train = { path = "crates/harpia-train", version = "0.2.0" }
+harpia-eval = { path = "crates/harpia-eval", version = "0.2.0" }
+harpia-verify = { path = "crates/harpia-verify", version = "0.2.0", default-features = false }
+harpia-pub = { path = "crates/harpia-pub", version = "0.2.0" }
+harpia = { path = "crates/harpia", version = "0.2.0" }
 
 # external (pure Rust; audit features before adding anything here)
 thiserror = "2.0"

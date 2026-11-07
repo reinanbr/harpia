@@ -1,0 +1,26 @@
+[package]
+name = "harpia-pub"
+description = "Scientific publishing tooling: tolerant LaTeX project loading, text extraction with source maps, and BibTeX parsing with positions."
+keywords = ["latex", "bibtex", "science", "publishing", "nlp"]
+categories = ["science", "text-processing", "parser-implementations"]
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+authors.workspace = true
+readme = "README.md"
+
+[dependencies]
+harpia-core = { workspace = true }
+serde = { workspace = true }
+unicode-normalization = { workspace = true }
+regex = { workspace = true }
+sha2 = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
+
+[lints]
+workspace = true

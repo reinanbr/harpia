@@ -62,12 +62,14 @@ verify-doaj = ["verify", "harpia-verify?/doaj"]
 verify-wikipedia = ["verify", "harpia-verify?/wikipedia"]
 ## Generic allowlisted web pages.
 verify-web = ["verify", "harpia-verify?/web"]
+## Scientific publishing: LaTeX projects, text extraction with source maps, BibTeX. Pure Rust.
+pub = ["dep:harpia-pub"]
 ## Every verify adapter.
 verify-all = ["verify-crossref", "verify-openalex", "verify-semantic-scholar", "verify-arxiv", "verify-europepmc", "verify-doaj", "verify-wikipedia", "verify-web"]
 ## LLM assistance for verification (claim decomposition, query rewriting, summaries). Off by default.
 verify-llm = ["verify", "structured", "harpia-verify?/llm"]
 ## Everything implemented so far, in pure Rust (add `tls` for HTTPS).
-full = ["text", "data", "structured", "langid", "tokenizers", "schema", "http", "client", "local", "hub", "train", "eval", "verify-all", "verify-llm"]
+full = ["text", "data", "structured", "pub", "langid", "tokenizers", "schema", "http", "client", "local", "hub", "train", "eval", "verify-all", "verify-llm"]
 
 [dependencies]
 harpia-core = { workspace = true }
@@ -80,6 +82,7 @@ harpia-local = { workspace = true, optional = true }
 harpia-train = { workspace = true, optional = true }
 harpia-eval = { workspace = true, optional = true }
 harpia-verify = { workspace = true, optional = true }
+harpia-pub = { workspace = true, optional = true }
 
 [dev-dependencies]
 serde = { workspace = true }

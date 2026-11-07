@@ -3,6 +3,7 @@
 #![warn(missing_docs)]
 
 mod data_cmd;
+mod eval_cmd;
 mod llm_cmd;
 mod local_cmd;
 mod text_cmd;
@@ -36,6 +37,9 @@ const EXAMPLES: &str = "Examples:
   harpia data synth topics.jsonl --provider ollama --model llama3.2 --template qa.toml --online -o qa.jsonl
   harpia data filter raw.jsonl --preset gopher-like -o clean.jsonl --report report.json
   harpia data pack chat.jsonl --tokenizer tokenizer.json --template chatml --seq-len 2048 -o packed.jsonl
+  harpia eval run --task capitals.toml --provider ollama --model llama3.2 --online --min capitals/exact_match=0.8 -o run.json
+  harpia eval rag outputs.jsonl --k 5 --classifier models/nli --thresholds th.json --min-faithfulness 0.7
+  harpia calibrate --val nli_val.jsonl --test nli_test.jsonl -o th.json
 
 Exit codes: 0 ok, 1 a check failed, 2 usage or environment error.";
 
@@ -71,6 +75,11 @@ enum Command {
     /// Dataset tools (inspect, convert, filter, pii, dedup, decontaminate, split, template, pack).
     #[command(subcommand)]
     Data(data_cmd::DataCommand),
+    /// Evaluate models and outputs (task harness, LLM judge, RAG metrics, perplexity, leaderboards).
+    #[command(subcommand)]
+    Eval(eval_cmd::EvalCommand),
+    /// Fit decision thresholds for classifier scores on a validation set; report frozen test metrics.
+    Calibrate(eval_cmd::CalibrateArgs),
 }
 
 fn main() -> ExitCode {
@@ -90,6 +99,8 @@ fn main() -> ExitCode {
         Command::Download(a) => local_cmd::download(a, cli.format),
         Command::Data(c) => data_cmd::run(c, cli.format),
         Command::Train(c) => train_cmd::run(c, cli.format),
+        Command::Eval(c) => eval_cmd::run(c, cli.format),
+        Command::Calibrate(a) => eval_cmd::calibrate(a, cli.format),
     };
     match result {
         Ok(code) => code,
