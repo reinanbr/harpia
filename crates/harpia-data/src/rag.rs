@@ -410,9 +410,15 @@ impl<'a> RagPipeline<'a> {
         })
     }
 
-    /// Ranked chunks for `query`.
+    /// Ranked chunks for `query` (the configured `top_k`).
     pub fn retrieve(&self, query: &str, filter: Option<&MetadataFilter>) -> Result<Vec<Retrieved>> {
-        let n = self.config.candidates.max(self.config.top_k);
+        self.retrieve_top(query, self.config.top_k, filter)
+    }
+
+    /// The `k` best chunks for `query`, overriding the configured `top_k` (candidates are raised
+    /// to at least `k`).
+    pub fn retrieve_top(&self, query: &str, k: usize, filter: Option<&MetadataFilter>) -> Result<Vec<Retrieved>> {
+        let n = self.config.candidates.max(k);
         let chunks = &self.store.chunks;
         let by_id = &self.store.by_id;
         let pass = |id: &str| filter.is_none_or(|f| by_id.get(id).is_some_and(|&i| f.matches(&chunks[i])));
@@ -467,7 +473,7 @@ impl<'a> RagPipeline<'a> {
             // Stable sort keeps fusion order among equal reranker scores.
             out.sort_by(|a, b| b.score.total_cmp(&a.score));
         }
-        out.truncate(self.config.top_k);
+        out.truncate(k);
         Ok(out)
     }
 

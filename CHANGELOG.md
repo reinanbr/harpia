@@ -20,6 +20,16 @@ All notable changes to this project are documented here. The format follows
   Localhost by default, optional bearer API key read from an environment variable, only
   registered models.
 - `docs/serve-protocol.md`; integration tests that drive both transports with tiny models.
+- `harpia rag index|query`: JSONL documents → chunked, embedded `RagPipeline` on disk (flat or
+  HNSW, RRF / weighted / dense / lexical fusion, `--append`); queries with metadata filters,
+  cross-encoder reranking and cited contexts within a token budget. `--queries` writes the
+  `retrieved` / `contexts` fields `harpia eval rag` reads.
+- `harpia rerank`: rank rows against one query, or each row's own query and documents.
+- `harpia verify answer|claim|dataset|reference|quote` (classifier label mapping, calibrated
+  thresholds, `--fail-on contradicted|unsupported|never`, disclosure log, BibTeX input, quotes
+  located by page in form-feed-separated full text) and `harpia sources list|check` (registry
+  as TOML, configuration checks, `--online` probes).
+- `RagPipeline::retrieve_top`: retrieve more (or fewer) hits than the saved `top_k`.
 
 ### Fixed
 

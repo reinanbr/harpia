@@ -114,6 +114,20 @@ harpia chat --provider local --model models/qwen2.5-0.5b-instruct "Olá!"
 harpia train classifier --base models/mnli --train pairs.jsonl --val val.jsonl --out models/my-nli --hypothesis claim
 harpia train sft --base models/qwen2.5-0.5b-instruct --data chat.jsonl --out adapters/sft --merge
 harpia data synth topics.jsonl --provider anthropic --model claude-opus-5-5 --template qa.toml --online -o qa.jsonl
+
+# RAG: index, query (hybrid + rerank + cited context), evaluate
+harpia rag index docs.jsonl --embedder models/e5-small -o idx --strategy markdown --size 1200
+harpia rag query idx "Where does the harpy eagle live?" --embedder models/e5-small --reranker models/rerank --budget 512
+harpia rag query idx --queries questions.jsonl --embedder models/e5-small -o retrieved.jsonl && harpia eval rag retrieved.jsonl
+harpia rerank --model models/rerank --query "harpy eagle diet" docs.jsonl --top-n 5
+
+# grounding against trusted sources (offline unless --online; every request is disclosed)
+harpia sources list --toml > trusted.toml
+harpia sources check --sources trusted.toml --online
+harpia verify answer answer.txt --classifier models/nli --sources trusted.toml --online --disclosure sent.json
+harpia verify dataset qa.jsonl --field output --classifier models/nli --online --drop-contradicted -o qa.ok.jsonl
+harpia verify reference --bib refs.bib --online
+harpia verify quote "readability formulas apply to textbooks" --text paper.txt --pages 12-14
 ```
 
 ### Serve: use Harpia from any language
@@ -291,8 +305,9 @@ reference checking) are mapped to Harpia APIs in `docs/errei-mapping.md`.
    and dataset verification, references and quotes.
 7. **serve**: done: `harpia serve --stdio` (JSON-RPC 2.0 with streaming) and an
    OpenAI-compatible `serve --http` (chat with SSE, completions, embeddings, rerank, `/rpc`).
-   Still to come in this milestone: the remaining examples, criterion benches and CLI commands
-   (`verify`, `sources`, `rag`, `rerank`).
+   CLI commands `rag index|query`, `rerank`, `verify answer|claim|dataset|reference|quote` and
+   `sources list|check`. Still to come in this milestone: the remaining examples and criterion
+   benches.
 
 Also planned for `harpia-data`: Parquet/Arrow, HTML and PDF readers, Hugging Face Hub
 downloads and model-based filters (perplexity and classifier filters need milestone 3).

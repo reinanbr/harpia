@@ -8,17 +8,14 @@ use harpia::core::traits::{
     Embedder, FinishReason, Generation, GenerationParams, PairClassifier, Reranker, Tokenizer, Translator,
 };
 use harpia::core::types::ToolCall;
-use harpia::core::{HarpiaError, Message, NetworkPolicy, Role, TokenUsage};
+use harpia::core::{HarpiaError, Message, Role, TokenUsage};
 use harpia::data::chunk::RecursiveChunker;
 use harpia::data::filter::{QualityFilter, QualityThresholds};
 use harpia::data::rag::RagPipeline;
 use harpia::local::{EncoderEmbedder, MarianTranslator, Search, SequenceClassifier, TextGenerator};
 use harpia::structured::constraint::{Choice, Constraint, JsonSchemaConstraint, RegexConstraint};
 use harpia::text::Lang;
-use harpia::verify::{
-    ClaimVerifier, FetchConfig, Fetcher, Mode, ReferenceConfig, ReferenceQuery, ReferenceVerifier, SourceRegistry,
-    VerifyConfig,
-};
+use harpia::verify::{ClaimVerifier, Fetcher, Mode, ReferenceConfig, ReferenceQuery, ReferenceVerifier, VerifyConfig};
 use serde_json::{Value, json};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -342,17 +339,11 @@ impl Engine {
     fn fetcher(&self) -> RpcResult<Arc<Fetcher>> {
         self.fetcher
             .get_or_init(|| {
-                let registry = match &self.cfg.sources {
-                    Some(p) => SourceRegistry::load(p).map_err(|e| e.to_string())?,
-                    None => SourceRegistry::builtin(),
-                };
-                let fc = FetchConfig {
-                    policy: if self.cfg.online { NetworkPolicy::Online } else { NetworkPolicy::Offline },
-                    mode: self.cfg.mode,
-                    store: self.cfg.store.clone(),
-                    ..FetchConfig::default()
-                };
-                Fetcher::new(registry, fc).map(Arc::new).map_err(|e| e.to_string())
+                let registry =
+                    crate::verify_cmd::load_registry(self.cfg.sources.as_deref()).map_err(|e| e.to_string())?;
+                crate::verify_cmd::build_fetcher(registry, self.cfg.online, self.cfg.store.clone(), self.cfg.mode)
+                    .map(Arc::new)
+                    .map_err(|e| e.to_string())
             })
             .clone()
             .map_err(|e| RpcError::new(code::HARPIA, e))
@@ -524,10 +515,8 @@ impl Engine {
             Some(f) => Some(serde_json::from_value(f.clone())?),
             None => None,
         };
-        let mut hits = rag.retrieve(query, filter.as_ref())?;
-        if let Some(k) = p.get("k").and_then(Value::as_u64) {
-            hits.truncate(k as usize);
-        }
+        let k = p.get("k").and_then(Value::as_u64).map_or(rag.config().top_k, |k| k as usize);
+        let hits = rag.retrieve_top(query, k, filter.as_ref())?;
         let mut out = json!({"index": name, "hits": hits});
         if let Some(budget) = p.get("budget").and_then(Value::as_u64) {
             let counter: Box<dyn Fn(&str) -> usize> = match opt_str(p, "tokenizer")? {

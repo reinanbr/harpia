@@ -9,7 +9,6 @@ use crate::util::OutputFormat;
 use clap::Args;
 use engine::{Engine, EngineConfig};
 use harpia::core::{HarpiaError, Result};
-use harpia::verify::Mode;
 use std::process::ExitCode;
 
 #[derive(Args)]
@@ -74,12 +73,7 @@ pub struct ServeArgs {
 }
 
 pub fn run(a: ServeArgs, _format: OutputFormat) -> Result<ExitCode> {
-    let mode = match a.mode.as_str() {
-        "live" => Mode::Live,
-        "cached-first" | "cached_first" => Mode::CachedFirst,
-        "frozen" => Mode::Frozen,
-        m => return Err(HarpiaError::invalid(format!("unknown --mode `{m}` (live, cached-first, frozen)"))),
-    };
+    let mode = crate::verify_cmd::parse_mode(&a.mode)?;
     let api_key = match &a.api_key_env {
         Some(var) => Some(
             std::env::var(var)

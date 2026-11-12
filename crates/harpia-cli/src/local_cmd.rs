@@ -300,3 +300,107 @@ pub fn download(a: DownloadArgs, format: OutputFormat) -> Result<ExitCode> {
     emit(format, json!({"path": dir}), || dir.display().to_string());
     Ok(ExitCode::SUCCESS)
 }
+
+#[derive(Args)]
+#[command(after_help = "Examples:
+  harpia rerank --model models/reranker --query 'harpy eagle diet' docs.jsonl --top-n 5
+  harpia rerank --model models/reranker candidates.jsonl --query-field question --documents-field contexts -o reranked.jsonl
+
+With --query, rows are documents: each gets `rerank_score` and the rows come out best first.
+Without it, each row holds its own query and a list of documents (strings or {\"text\": ...}) and
+gets `reranked`: [{index, score, text}], best first.")]
+pub struct RerankArgs {
+    /// Cross-encoder directory.
+    #[arg(long)]
+    pub model: String,
+    /// JSONL input (`-` for stdin).
+    pub input: String,
+    /// Rank every row against this query.
+    #[arg(long)]
+    pub query: Option<String>,
+    /// Document text field (with --query).
+    #[arg(long, default_value = "text")]
+    pub field: String,
+    /// Query field (per-row mode).
+    #[arg(long, default_value = "query")]
+    pub query_field: String,
+    /// Documents field (per-row mode).
+    #[arg(long, default_value = "documents")]
+    pub documents_field: String,
+    /// Keep only the best N.
+    #[arg(long)]
+    pub top_n: Option<usize>,
+    /// Maximum tokens per (query, document) pair.
+    #[arg(long, default_value_t = 512)]
+    pub max_len: usize,
+    /// Output file (stdout when omitted).
+    #[arg(short, long)]
+    pub output: Option<String>,
+}
+
+pub fn rerank(a: RerankArgs, format: OutputFormat) -> Result<ExitCode> {
+    use harpia::core::traits::Reranker;
+    let rr = SequenceClassifier::load_with(Path::new(&a.model), &Device::Cpu, DType::F32, a.max_len)?;
+    let rows = read_records(&a.input)?;
+    let order = |scores: &[f32]| {
+        let mut idx: Vec<usize> = (0..scores.len()).collect();
+        idx.sort_by(|&x, &y| scores[y].total_cmp(&scores[x]).then(x.cmp(&y)));
+        idx.truncate(a.top_n.unwrap_or(scores.len()));
+        idx
+    };
+    let out: Vec<Value> = match &a.query {
+        Some(q) => {
+            let texts: Vec<String> =
+                rows.iter().map(|r| field(r, &a.field).map(String::from)).collect::<Result<_>>()?;
+            let refs: Vec<&str> = texts.iter().map(String::as_str).collect();
+            let scores = rr.rerank(q, &refs)?;
+            order(&scores)
+                .into_iter()
+                .map(|i| {
+                    let mut r = rows[i].clone();
+                    if let Some(o) = r.as_object_mut() {
+                        o.insert("rerank_score".into(), json!(scores[i]));
+                    }
+                    r
+                })
+                .collect()
+        }
+        None => rows
+            .into_iter()
+            .enumerate()
+            .map(|(n, mut r)| {
+                let q = field(&r, &a.query_field)?.to_string();
+                let docs: Vec<String> = get_path(&r, &a.documents_field)
+                    .and_then(Value::as_array)
+                    .ok_or_else(|| HarpiaError::invalid(format!("row {}: no array `{}`", n + 1, a.documents_field)))?
+                    .iter()
+                    .map(|d| {
+                        d.as_str().or_else(|| d.get("text").and_then(Value::as_str)).map(String::from).ok_or_else(
+                            || {
+                                HarpiaError::invalid(format!(
+                                    "row {}: documents must be strings or {{\"text\"}}",
+                                    n + 1
+                                ))
+                            },
+                        )
+                    })
+                    .collect::<Result<_>>()?;
+                let refs: Vec<&str> = docs.iter().map(String::as_str).collect();
+                let scores = rr.rerank(&q, &refs)?;
+                let ranked: Vec<Value> = order(&scores)
+                    .into_iter()
+                    .map(|i| json!({"index": i, "score": scores[i], "text": docs[i]}))
+                    .collect();
+                if let Some(o) = r.as_object_mut() {
+                    o.insert("reranked".into(), json!(ranked));
+                }
+                Ok(r)
+            })
+            .collect::<Result<_>>()?,
+    };
+    write_records(a.output.as_deref(), &out)?;
+    if a.output.is_some() {
+        emit(format, json!({"rows": out.len()}), || format!("reranked into {} rows", out.len()));
+    }
+    Ok(ExitCode::SUCCESS)
+}

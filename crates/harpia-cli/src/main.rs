@@ -6,10 +6,12 @@ mod data_cmd;
 mod eval_cmd;
 mod llm_cmd;
 mod local_cmd;
+mod rag_cmd;
 mod serve;
 mod text_cmd;
 mod train_cmd;
 mod util;
+mod verify_cmd;
 
 use clap::{Parser, Subcommand};
 use std::process::ExitCode;
@@ -41,6 +43,9 @@ const EXAMPLES: &str = "Examples:
   harpia eval run --task capitals.toml --provider ollama --model llama3.2 --online --min capitals/exact_match=0.8 -o run.json
   harpia eval rag outputs.jsonl --k 5 --classifier models/nli --thresholds th.json --min-faithfulness 0.7
   harpia calibrate --val nli_val.jsonl --test nli_test.jsonl -o th.json
+  harpia rag index docs.jsonl --embedder models/e5-small -o idx && harpia rag query idx 'harpy eagle diet' --embedder models/e5-small
+  harpia verify answer answer.txt --classifier models/nli --sources trusted.toml --online
+  harpia verify reference --bib refs.bib --online
   harpia serve --http --decoder models/qwen2.5-0.5b-instruct --embedder models/e5-small
 
 Exit codes: 0 ok, 1 a check failed, 2 usage or environment error.";
@@ -69,6 +74,17 @@ enum Command {
     Translate(local_cmd::TranslateArgs),
     /// Add sentence embeddings to JSONL rows with a local encoder model.
     Embed(local_cmd::EmbedArgs),
+    /// Rerank documents for a query with a local cross-encoder.
+    Rerank(local_cmd::RerankArgs),
+    /// Build and query RAG indexes (chunk, embed, hybrid retrieval, rerank, cited context).
+    #[command(subcommand)]
+    Rag(rag_cmd::RagCommand),
+    /// Ground answers, claims, datasets, references and quotes against trusted sources.
+    #[command(subcommand)]
+    Verify(verify_cmd::VerifyCommand),
+    /// Inspect and check trusted-source registries.
+    #[command(subcommand)]
+    Sources(verify_cmd::SourcesCommand),
     /// Download a model snapshot from the Hugging Face Hub (needs --online).
     Download(local_cmd::DownloadArgs),
     /// Fine-tune models (classifier, LoRA SFT, DPO).
@@ -100,6 +116,10 @@ fn main() -> ExitCode {
         Command::Classify(a) => local_cmd::classify(a, cli.format),
         Command::Translate(a) => local_cmd::translate(a, cli.format),
         Command::Embed(a) => local_cmd::embed(a, cli.format),
+        Command::Rerank(a) => local_cmd::rerank(a, cli.format),
+        Command::Rag(c) => rag_cmd::run(c, cli.format),
+        Command::Verify(c) => verify_cmd::run(c, cli.format),
+        Command::Sources(c) => verify_cmd::sources(c, cli.format),
         Command::Download(a) => local_cmd::download(a, cli.format),
         Command::Data(c) => data_cmd::run(c, cli.format),
         Command::Train(c) => train_cmd::run(c, cli.format),

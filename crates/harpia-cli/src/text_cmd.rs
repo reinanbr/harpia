@@ -180,27 +180,30 @@ pub struct ChunkArgs {
     pub tokenizer: Option<String>,
 }
 
+/// Build a chunker from CLI options (shared by `chunk` and `rag index`).
+pub fn build_chunker(
+    strategy: Strategy,
+    size: usize,
+    overlap: usize,
+    lang_name: &str,
+    tokenizer: Option<&str>,
+) -> Result<Box<dyn Chunker>> {
+    Ok(match strategy {
+        Strategy::Fixed => Box::new(FixedChunker { size, overlap }),
+        Strategy::Sentence => Box::new(SentenceChunker { max_chars: size, overlap, lang: lang(lang_name)?.data() }),
+        Strategy::Recursive => Box::new(RecursiveChunker::new(size)),
+        Strategy::Markdown => Box::new(MarkdownChunker { max_chars: size }),
+        Strategy::Token => {
+            let path =
+                tokenizer.ok_or_else(|| HarpiaError::invalid("--strategy token needs --tokenizer <tokenizer.json>"))?;
+            Box::new(TokenChunker { tokenizer: Arc::new(HfTokenizer::from_file(path)?), max_tokens: size, overlap })
+        }
+    })
+}
+
 pub fn chunk(a: ChunkArgs, format: OutputFormat) -> Result<ExitCode> {
     let text = read_text(&a.file)?;
-    let chunker: Box<dyn Chunker> = match a.strategy {
-        Strategy::Fixed => Box::new(FixedChunker { size: a.size, overlap: a.overlap }),
-        Strategy::Sentence => {
-            Box::new(SentenceChunker { max_chars: a.size, overlap: a.overlap, lang: lang(&a.lang)?.data() })
-        }
-        Strategy::Recursive => Box::new(RecursiveChunker::new(a.size)),
-        Strategy::Markdown => Box::new(MarkdownChunker { max_chars: a.size }),
-        Strategy::Token => {
-            let path = a
-                .tokenizer
-                .as_deref()
-                .ok_or_else(|| HarpiaError::invalid("--strategy token needs --tokenizer <tokenizer.json>"))?;
-            Box::new(TokenChunker {
-                tokenizer: Arc::new(HfTokenizer::from_file(path)?),
-                max_tokens: a.size,
-                overlap: a.overlap,
-            })
-        }
-    };
+    let chunker = build_chunker(a.strategy, a.size, a.overlap, &a.lang, a.tokenizer.as_deref())?;
     let chunks = chunker.chunk(&text)?;
     let items: Vec<Value> = chunks
         .iter()
