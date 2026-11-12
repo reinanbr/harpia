@@ -30,9 +30,27 @@ All notable changes to this project are documented here. The format follows
   located by page in form-feed-separated full text) and `harpia sources list|check` (registry
   as TOML, configuration checks, `--online` probes).
 - `RagPipeline::retrieve_top`: retrieve more (or fewer) hits than the saved `top_k`.
+- Examples (`examples/`, all self-contained: tiny random-weight models and mocked providers or
+  servers, no downloads): `synthetic_data` (schema-constrained generation with provenance and a
+  resumable cache), `lora_sft` (train, export, reload adapter and merged weights), `dpo`,
+  `constrained_generation` (JSON Schema, choice and regex), `rag_end_to_end` (chunk, embed,
+  hybrid retrieval, rerank, cited context, answer, retrieval and faithfulness metrics),
+  `eval_and_judge` (harness, leaderboard, rubric and position-swapped pairwise judging),
+  `grounding` (answer checked against a mocked trusted-source registry, disclosure log) and
+  `classifier_calibration` (cross-encoder fine-tuning with label remapping, thresholds tuned on
+  validation and applied frozen on test).
+- Criterion benches: `harpia-data` (curation, MinHash dedup, chat template + loss mask + pack,
+  flat and HNSW queries at 100k vectors), `harpia-structured` (JSON Schema token mask over a 32k
+  vocabulary), `harpia-local` (time to first token, tokens/s, pairs/s, embeddings/s) and
+  `harpia-train` (LoRA SFT steps); model benches take real model directories from
+  `HARPIA_BENCH_DECODER`, `HARPIA_BENCH_ENCODER` and `HARPIA_BENCH_EMBEDDER`. Measured figures in
+  `docs/benchmarks.md`.
 
 ### Fixed
 
+- `harpia_local::testing` models are now seeded: weights are redrawn from a fixed, name-seeded
+  generator (candle's CPU initializers cannot be seeded), so tests and examples built on tiny
+  models give the same results on every run instead of starting from different random weights.
 - `TextGenerator` and `MarianTranslator` stop at the model's `max_position_embeddings` (finish
   reason `length`) instead of failing inside candle when `max_new_tokens` exceeds the position
   table. Inputs that do not fit at all return a clear error.

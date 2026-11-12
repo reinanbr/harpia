@@ -88,6 +88,7 @@ harpia-pub = { workspace = true, optional = true }
 serde = { workspace = true }
 tokio = { workspace = true, features = ["rt", "macros"] }
 futures-util = { workspace = true }
+tempfile = { workspace = true }
 [dev-dependencies.serde_json]
 workspace = true
 
@@ -118,3 +119,43 @@ workspace = true
 name = "streaming_client"
 path = "../../examples/streaming_client.rs"
 required-features = ["client"]
+
+[[example]]
+name = "synthetic_data"
+path = "../../examples/synthetic_data.rs"
+required-features = ["client", "eval"]
+
+[[example]]
+name = "lora_sft"
+path = "../../examples/lora_sft.rs"
+required-features = ["train"]
+
+[[example]]
+name = "dpo"
+path = "../../examples/dpo.rs"
+required-features = ["train"]
+
+[[example]]
+name = "constrained_generation"
+path = "../../examples/constrained_generation.rs"
+required-features = ["local"]
+
+[[example]]
+name = "rag_end_to_end"
+path = "../../examples/rag_end_to_end.rs"
+required-features = ["data", "eval"]
+
+[[example]]
+name = "eval_and_judge"
+path = "../../examples/eval_and_judge.rs"
+required-features = ["eval"]
+
+[[example]]
+name = "grounding"
+path = "../../examples/grounding.rs"
+required-features = ["verify"]
+
+[[example]]
+name = "classifier_calibration"
+path = "../../examples/classifier_calibration.rs"
+required-features = ["train", "eval"]

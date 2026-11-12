@@ -306,16 +306,18 @@ reference checking) are mapped to Harpia APIs in `docs/errei-mapping.md`.
 7. **serve**: done: `harpia serve --stdio` (JSON-RPC 2.0 with streaming) and an
    OpenAI-compatible `serve --http` (chat with SSE, completions, embeddings, rerank, `/rpc`).
    CLI commands `rag index|query`, `rerank`, `verify answer|claim|dataset|reference|quote` and
-   `sources list|check`. Still to come in this milestone: the remaining examples and criterion
-   benches.
+   `sources list|check`. Examples for every pillar (`examples/`, run with
+   `cargo run -p harpia --example <name> --features <features>`) and criterion benches for data,
+   retrieval, constrained decoding, inference and LoRA training.
 
 Also planned for `harpia-data`: Parquet/Arrow, HTML and PDF readers, Hugging Face Hub
 downloads and model-based filters (perplexity and classifier filters need milestone 3).
 
 ## Benchmarks
 
-Criterion benchmarks live in `crates/*/benches` (`cargo bench -p harpia-text`,
-`cargo bench -p harpia-structured`). Comparisons against the Python reference libraries are
+Criterion benchmarks live in `crates/*/benches` (text, structured output, data curation and
+retrieval, local inference, LoRA training; the model benches take real model directories from
+`HARPIA_BENCH_*` environment variables). Comparisons against the Python reference libraries are
 **TODO**: they will be published only when measured on the same machine, with hardware and
 commit stated. Raw Harpia-only numbers and the comparison protocol are in
 [`docs/benchmarks.md`](docs/benchmarks.md).

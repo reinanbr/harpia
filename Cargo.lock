@@ -1473,6 +1473,7 @@ dependencies = [
  "harpia-verify",
  "serde",
  "serde_json",
+ "tempfile",
  "tokio",
 ]
 
@@ -1529,6 +1530,7 @@ dependencies = [
 name = "harpia-data"
 version = "0.2.0"
 dependencies = [
+ "criterion",
  "csv",
  "flate2",
  "harpia-core",
@@ -1595,6 +1597,7 @@ dependencies = [
  "candle-core",
  "candle-nn",
  "candle-transformers",
+ "criterion",
  "futures-core",
  "harpia-core",
  "harpia-data",
@@ -1656,6 +1659,7 @@ version = "0.2.0"
 dependencies = [
  "candle-core",
  "candle-nn",
+ "criterion",
  "harpia-core",
  "harpia-data",
  "harpia-eval",

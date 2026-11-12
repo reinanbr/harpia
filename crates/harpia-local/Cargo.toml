@@ -40,6 +40,11 @@ metal = ["candle-core/metal", "candle-nn/metal", "candle-transformers/metal"]
 tempfile = { workspace = true }
 tokio = { workspace = true, features = ["rt"] }
 serde_json = { workspace = true }
+criterion = { workspace = true }
+
+[[bench]]
+name = "inference"
+harness = false
 
 [lints]
 workspace = true

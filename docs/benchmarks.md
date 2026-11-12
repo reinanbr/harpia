@@ -5,7 +5,14 @@ Run:
 ```bash
 cargo bench -p harpia-text
 cargo bench -p harpia-structured
+cargo bench -p harpia-data          # curation, dedup, template+pack, flat/HNSW retrieval
+cargo bench -p harpia-local         # tiny models unless HARPIA_BENCH_{DECODER,ENCODER,EMBEDDER} are set
+cargo bench -p harpia-train         # tiny decoder unless HARPIA_BENCH_DECODER is set
 ```
+
+The local and train benches run on the tiny random-weight models from `harpia_local::testing`
+by default; those figures measure plumbing overhead only and are not reported here. Point the
+`HARPIA_BENCH_*` variables at real Hugging Face model directories for real numbers.
 
 ## Harpia-only measurements
 
@@ -27,6 +34,26 @@ on an Intel Core i5-12450H (12 threads, Linux 7.0, rustc 1.97.1), commit: initia
 
 The repeated-paragraph input has few distinct shingles, so `minhash_128` is dominated by
 shingling here; real corpora with more distinct shingles will cost more per byte.
+
+## Data, retrieval and constrained decoding
+
+Measured with `cargo bench -p harpia-data --bench data` and `cargo bench -p harpia-structured
+--bench repair` (`--warm-up-time 1 --measurement-time 3`) on the same i5-12450H, rustc 1.97.1,
+milestone 7 (after commit becd6ef). Inputs are synthetic and seeded (see the bench sources).
+
+| benchmark | input | median time | throughput |
+|---|---|---:|---:|
+| `data/curate` (normalize + quality filter + PII) | 2 000 English docs, 1.3 MiB | 9.5 ms | 139 MiB/s |
+| `data/minhash_dedup` (5-shingles, LSH for 0.8) | same docs, 20% near-copies | 23.4 ms | 56 MiB/s |
+| `data/template_mask_pack` (ChatML + spans + loss mask + best-fit pack to 4096) | 500 chats | 6.4 ms | 69 M byte-tokens/s |
+| `retrieval/flat_query_100000` (cosine, top 10) | 100k × 128-d random vectors | 7.6 ms / query | 132 queries/s |
+| `retrieval/hnsw_query_100000` (default params, top 10) | same | 0.43 ms / query | 2 350 queries/s |
+| `structured/token_mask_32k_vocab` (JSON Schema mask, one decoding step) | 32k-entry vocabulary | 4.5 ms | – |
+
+Building the indexes for the retrieval bench took 46 ms (flat) and 107 s (HNSW, sequential
+inserts, about 1 ms per vector): HNSW construction is the slow path today. Token ids in
+`template_mask_pack` are bytes, so real tokenizers add their own cost on top. The 4.5 ms mask
+is per generated token under a constraint and is paid on top of the forward pass.
 
 ## Comparisons with Python
 
