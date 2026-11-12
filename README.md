@@ -116,6 +116,34 @@ harpia train sft --base models/qwen2.5-0.5b-instruct --data chat.jsonl --out ada
 harpia data synth topics.jsonl --provider anthropic --model claude-opus-5-5 --template qa.toml --online -o qa.jsonl
 ```
 
+### Serve: use Harpia from any language
+
+```bash
+# drop-in OpenAI-compatible endpoint (localhost only by default)
+harpia serve --http --bind 127.0.0.1:8080 --decoder qwen=models/qwen2.5-0.5b-instruct --embedder e5=models/e5-small
+curl -s localhost:8080/v1/chat/completions -H 'content-type: application/json' \
+  -d '{"model": "qwen", "messages": [{"role": "user", "content": "Olá!"}], "stream": true}'
+
+# newline-delimited JSON-RPC 2.0 for subprocess use; models stay loaded
+echo '{"jsonrpc":"2.0","id":1,"method":"structured.repair","params":{"text":"{a: 1,}"}}' | harpia serve --stdio
+```
+
+From Python, with no bindings (documentation only; the repository has no Python files):
+
+```python
+import json, subprocess
+p = subprocess.Popen(["harpia", "serve", "--stdio", "--embedder", "models/e5-small"],
+                     stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True)
+p.stdin.write(json.dumps({"jsonrpc": "2.0", "id": 1, "method": "embed", "params": {"texts": ["olá"]}}) + "\n")
+p.stdin.flush()
+print(json.loads(p.stdout.readline())["result"]["dim"])
+```
+
+`serve --stdio` exposes `generate`, `chat`, `embed`, `rerank`, `classify`, `translate`,
+`retrieve`, `verify.claim|answer|reference`, `data.filter` and `structured.repair`; `serve --http`
+serves `/v1/chat/completions` (SSE streaming), `/v1/completions`, `/v1/embeddings`,
+`/v1/rerank` and the same methods at `/rpc`. See [`docs/serve-protocol.md`](docs/serve-protocol.md).
+
 `data synth` renders a TOML recipe (`user`, optional `system`, `schema`, `output_field`,
 `params`) per row, caches every response in `--cache` so an interrupted run resumes, and adds
 the output plus a `_provenance` object (provider, model, prompt hash, seed, usage) to each row.
@@ -147,8 +175,9 @@ environment error.
 | `metal` | no | Apple GPU inference | **yes** (Metal) |
 | `tls` | no | HTTPS for `http`/`client`/`verify` via rustls + `ring` (verification needs it for real sources) | **yes** (`ring`: C/assembly) |
 
-The `harpia-cli` binary enables `tls` by default; `cargo install harpia-cli --no-default-features`
-builds a pure-Rust binary for local `http://` servers.
+The `harpia-cli` binary enables `tls` and `server` (the `serve --http` server, axum, pure Rust)
+by default; `cargo install harpia-cli --no-default-features --features server` builds a
+pure-Rust binary for local `http://` servers.
 
 See [`docs/models.md`](docs/models.md) for supported architectures, verification status and limits.
 
@@ -260,7 +289,10 @@ reference checking) are mapped to Harpia APIs in `docs/errei-mapping.md`.
    retrieval (flat/HNSW, BM25, hybrid, rerank, `RagPipeline`) in `harpia-data`.
 6. **verify**: done: trusted-source registry and allowlist enforcement, adapters, claim, answer
    and dataset verification, references and quotes.
-7. **serve**: `harpia serve --stdio` (JSON-RPC) and an OpenAI-compatible `serve --http`.
+7. **serve**: done: `harpia serve --stdio` (JSON-RPC 2.0 with streaming) and an
+   OpenAI-compatible `serve --http` (chat with SSE, completions, embeddings, rerank, `/rpc`).
+   Still to come in this milestone: the remaining examples, criterion benches and CLI commands
+   (`verify`, `sources`, `rag`, `rerank`).
 
 Also planned for `harpia-data`: Parquet/Arrow, HTML and PDF readers, Hugging Face Hub
 downloads and model-based filters (perplexity and classifier filters need milestone 3).

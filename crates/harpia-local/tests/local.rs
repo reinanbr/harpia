@@ -1,7 +1,8 @@
 //! Local inference on tiny random-weight models (no downloads).
 
 use harpia_core::traits::{
-    ChatRequest, Embedder, GenerationParams, Model, PairClassifier, Provider, Reranker, Translator,
+    ChatRequest, Embedder, FinishReason, GenerationParams, Model, PairClassifier, Provider, Reranker, Tokenizer,
+    Translator,
 };
 use harpia_core::types::Message;
 use harpia_local::{EncoderEmbedder, MarianTranslator, ModelCache, Search, SequenceClassifier, TextGenerator, testing};
@@ -167,6 +168,22 @@ fn marian_greedy_and_beam() {
     assert_eq!(b.len(), 2);
 }
 
+/// The default `max_new_tokens` (256) exceeds the tiny model's 64 positions; random weights
+/// never emit `</s>`, so decoding must stop at the position table instead of failing.
+#[test]
+fn marian_stops_at_position_table() {
+    let dir = tempfile::tempdir().unwrap();
+    testing::marian(dir.path()).unwrap();
+    let mut mt = MarianTranslator::load(dir.path()).unwrap();
+    assert_eq!(mt.max_new_tokens, 256);
+    mt.translate(&["the harpy eagle"]).unwrap();
+    mt.search = Search::Beam { width: 2 };
+    mt.translate(&["the harpy eagle"]).unwrap();
+    let long = vec!["eagle"; 100].join(" ");
+    let err = mt.translate(&[long.as_str()]).unwrap_err().to_string();
+    assert!(err.contains("at most 64"), "{err}");
+}
+
 /// Real `opus-mt-*` checkpoint straight from the Hugging Face cache (`source.spm` +
 /// `vocab.json`, no `tokenizer.json`). Run with
 /// `HARPIA_MARIAN_DIR=<snapshot dir> cargo test -p harpia-local -- --ignored marian_spm`.
@@ -192,4 +209,21 @@ fn marian_spm_real_model() {
         assert_eq!(mt.translate_one(text).unwrap(), row["translation"].as_str().unwrap(), "translation of {text:?}");
     }
     eprintln!("{} rows match transformers", rows.len());
+}
+
+/// Asking for more tokens than the position table holds (128 in the tiny Qwen2) stops at the
+/// table with `Length` instead of failing inside the model.
+#[test]
+fn decoder_stops_at_position_table() {
+    let dir = tempfile::tempdir().unwrap();
+    testing::qwen2(dir.path()).unwrap();
+    let lm = TextGenerator::load(dir.path()).unwrap();
+    let ids = lm.tokenizer().encode("the harpy eagle", true).unwrap().ids;
+    let params = GenerationParams { max_new_tokens: 300, ..Default::default() };
+    let g = lm.generate_with(&ids, &params, None, |_| {}).unwrap();
+    if g.finish_reason == FinishReason::Length {
+        assert_eq!(g.token_ids.len() + ids.len(), 128);
+    }
+    let long = vec![7u32; 128];
+    assert!(lm.generate_with(&long, &params, None, |_| {}).unwrap_err().to_string().contains("128 positions"));
 }

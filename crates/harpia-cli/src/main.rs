@@ -6,6 +6,7 @@ mod data_cmd;
 mod eval_cmd;
 mod llm_cmd;
 mod local_cmd;
+mod serve;
 mod text_cmd;
 mod train_cmd;
 mod util;
@@ -40,6 +41,7 @@ const EXAMPLES: &str = "Examples:
   harpia eval run --task capitals.toml --provider ollama --model llama3.2 --online --min capitals/exact_match=0.8 -o run.json
   harpia eval rag outputs.jsonl --k 5 --classifier models/nli --thresholds th.json --min-faithfulness 0.7
   harpia calibrate --val nli_val.jsonl --test nli_test.jsonl -o th.json
+  harpia serve --http --decoder models/qwen2.5-0.5b-instruct --embedder models/e5-small
 
 Exit codes: 0 ok, 1 a check failed, 2 usage or environment error.";
 
@@ -80,6 +82,8 @@ enum Command {
     Eval(eval_cmd::EvalCommand),
     /// Fit decision thresholds for classifier scores on a validation set; report frozen test metrics.
     Calibrate(eval_cmd::CalibrateArgs),
+    /// Serve loaded models over JSON-RPC on stdio or an OpenAI-compatible HTTP API.
+    Serve(serve::ServeArgs),
 }
 
 fn main() -> ExitCode {
@@ -101,6 +105,7 @@ fn main() -> ExitCode {
         Command::Train(c) => train_cmd::run(c, cli.format),
         Command::Eval(c) => eval_cmd::run(c, cli.format),
         Command::Calibrate(a) => eval_cmd::calibrate(a, cli.format),
+        Command::Serve(a) => serve::run(a, cli.format),
     };
     match result {
         Ok(code) => code,

@@ -160,6 +160,8 @@ pub struct TextGenerator {
     dir: PathBuf,
     vocab: OnceLock<Vec<String>>,
     defaults: GenerationParams,
+    /// `max_position_embeddings`, when the config states it: prompt + output never exceed it.
+    max_positions: Option<usize>,
 }
 
 impl std::fmt::Debug for TextGenerator {
@@ -189,6 +191,7 @@ impl TextGenerator {
         }
         let vb = VarBuilder::from_tensors(tensors, dtype, device);
         let lm = CausalLm::from_var_builder(&md, vb, dtype, device)?.0;
+        let max_positions = md.config["max_position_embeddings"].as_u64().map(|n| n as usize);
         let tokenizer = md.tokenizer()?;
         let mut eos = md.token_ids("eos_token_id");
         let mut defaults = GenerationParams::default();
@@ -222,6 +225,7 @@ impl TextGenerator {
             dir: dir.to_path_buf(),
             vocab: OnceLock::new(),
             defaults,
+            max_positions,
         })
     }
 
@@ -265,6 +269,19 @@ impl TextGenerator {
         if prompt_ids.is_empty() {
             return Err(HarpiaError::invalid("empty prompt"));
         }
+        if let Some(max) = self.max_positions
+            && prompt_ids.len() >= max
+        {
+            return Err(model_err(
+                &self.dir,
+                format!("prompt has {} tokens; the model has {max} positions", prompt_ids.len()),
+            ));
+        }
+        // never decode past the position table (the result then stops with `Length`)
+        let steps = match self.max_positions {
+            Some(max) => (params.max_new_tokens as usize).min(max - prompt_ids.len()),
+            None => params.max_new_tokens as usize,
+        };
         let ce = |e: candle_core::Error| model_err(&self.dir, e);
         let mut lm = self.lm.lock().expect("model lock");
         lm.reset().map_err(ce)?;
@@ -277,7 +294,7 @@ impl TextGenerator {
         let mut text = String::new();
         let mut finish = FinishReason::Length;
         let vocab = if constraint.is_some() { Some(self.vocab()) } else { None };
-        for step in 0..params.max_new_tokens as usize {
+        for step in 0..steps {
             let raw = log_softmax(&logits);
             apply_penalties(&mut logits, &context, &generated, params);
             let choice = match (constraint, vocab) {

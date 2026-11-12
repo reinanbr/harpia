@@ -36,13 +36,15 @@ pub struct MarianTranslator {
     start: u32,
     eos: u32,
     pad: u32,
+    /// Decoder positions (`max_position_embeddings`): generation never runs past them.
+    max_positions: usize,
     device: Device,
     dir: PathBuf,
     /// Prepended to every source text (multilingual models), e.g. `">>por<<"`.
     pub prefix: Option<String>,
     /// Decoding strategy (default greedy).
     pub search: Search,
-    /// Maximum generated tokens per sentence.
+    /// Maximum generated tokens per sentence. Also capped by the model's `max_position_embeddings`.
     pub max_new_tokens: usize,
 }
 
@@ -85,6 +87,7 @@ impl MarianTranslator {
             start: cfg.decoder_start_token_id,
             eos: cfg.eos_token_id,
             pad: cfg.pad_token_id,
+            max_positions: cfg.max_position_embeddings,
             device: device.clone(),
             dir: dir.to_path_buf(),
             prefix: None,
@@ -131,6 +134,13 @@ impl MarianTranslator {
     /// Translate one text.
     pub fn translate_one(&self, text: &str) -> Result<String> {
         let ids = self.encode_source(text)?;
+        if ids.len() > self.max_positions {
+            return Err(self.err(format!(
+                "source has {} tokens; the model accepts at most {} (split the text first)",
+                ids.len(),
+                self.max_positions
+            )));
+        }
         let mut model = self.model.lock().expect("marian lock");
         model.reset_kv_cache();
         let input = Tensor::new(ids.as_slice(), &self.device).and_then(|t| t.unsqueeze(0)).map_err(|e| self.err(e))?;
@@ -138,7 +148,7 @@ impl MarianTranslator {
         let out = match self.search {
             Search::Greedy => {
                 let mut tokens = vec![self.start];
-                for i in 0..self.max_new_tokens {
+                for i in 0..self.step_limit() {
                     let ctx = if i == 0 { tokens.len() } else { 1 };
                     let start_pos = tokens.len() - ctx;
                     let logits = self.last_logits(&mut model, &tokens[start_pos..], &enc, start_pos)?;
@@ -156,10 +166,16 @@ impl MarianTranslator {
         self.tok.decode(&body)
     }
 
+    /// Decoding steps: `max_new_tokens`, but never beyond the decoder's position table
+    /// (the start token takes one position).
+    fn step_limit(&self) -> usize {
+        self.max_new_tokens.min(self.max_positions.saturating_sub(1))
+    }
+
     fn beam(&self, model: &mut marian::MTModel, enc: &Tensor, width: usize) -> Result<Vec<u32>> {
         // (tokens, sum log-prob, finished)
         let mut beams: Vec<(Vec<u32>, f32, bool)> = vec![(vec![self.start], 0.0, false)];
-        for _ in 0..self.max_new_tokens {
+        for _ in 0..self.step_limit() {
             if beams.iter().all(|b| b.2) {
                 break;
             }

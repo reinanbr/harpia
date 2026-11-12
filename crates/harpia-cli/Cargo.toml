@@ -13,10 +13,12 @@ authors.workspace = true
 readme = "README.md"
 
 [features]
-default = ["tls"]
+default = ["tls", "server"]
 ## HTTPS for `harpia chat` and `data synth` against hosted APIs (rustls + ring, needs a C compiler).
 ## Build with `--no-default-features` for a pure-Rust binary that talks to `http://` servers only.
 tls = ["harpia/tls"]
+## `harpia serve --http` (OpenAI-compatible server on axum; pure Rust).
+server = ["dep:axum", "tokio/net", "tokio/signal"]
 
 [[bin]]
 name = "harpia"
@@ -28,6 +30,7 @@ doc = false
 harpia = { workspace = true, features = ["full"] }
 tokio = { workspace = true, features = ["rt-multi-thread"] }
 futures-util = { workspace = true }
+axum = { workspace = true, optional = true }
 clap = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }

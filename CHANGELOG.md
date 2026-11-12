@@ -6,6 +6,27 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added (milestone 7: serve)
+
+- `harpia serve --stdio`: newline-delimited JSON-RPC 2.0 (batches, notifications, streaming
+  deltas as `stream` notifications) exposing `info`, `generate`, `chat`, `embed`, `rerank`,
+  `classify`, `translate`, `retrieve`, `verify.claim`, `verify.answer`, `verify.reference`,
+  `data.filter`, `structured.repair` and `shutdown`. Models registered as `[name=]dir` load at
+  startup and stay loaded; stdio clients may also name model directories.
+- `harpia serve --http` (feature `server`, axum, pure Rust, on by default in `harpia-cli`):
+  OpenAI-compatible `/v1/chat/completions` (SSE streaming, `stream_options.include_usage`,
+  `response_format` JSON schema, tool-call parsing), `/v1/completions`, `/v1/embeddings`
+  (float and base64), `/v1/rerank`, `/v1/models`, `/health`, and JSON-RPC at `/rpc`.
+  Localhost by default, optional bearer API key read from an environment variable, only
+  registered models.
+- `docs/serve-protocol.md`; integration tests that drive both transports with tiny models.
+
+### Fixed
+
+- `TextGenerator` and `MarianTranslator` stop at the model's `max_position_embeddings` (finish
+  reason `length`) instead of failing inside candle when `max_new_tokens` exceeds the position
+  table. Inputs that do not fit at all return a clear error.
+
 ### Added (milestone 6: verify)
 
 - `harpia-verify`: TOML `SourceRegistry` (built-in Crossref, OpenAlex, Semantic Scholar, arXiv,
