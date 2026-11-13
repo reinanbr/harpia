@@ -1457,7 +1457,7 @@ dependencies = [
 
 [[package]]
 name = "harpia"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "futures-util",
  "harpia-client",
@@ -1479,7 +1479,7 @@ dependencies = [
 
 [[package]]
 name = "harpia-cli"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "assert_cmd",
  "axum",
@@ -1497,7 +1497,7 @@ dependencies = [
 
 [[package]]
 name = "harpia-client"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "futures-core",
  "futures-util",
@@ -1518,7 +1518,7 @@ dependencies = [
 
 [[package]]
 name = "harpia-core"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "futures-core",
  "serde",
@@ -1528,7 +1528,7 @@ dependencies = [
 
 [[package]]
 name = "harpia-data"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "criterion",
  "csv",
@@ -1551,7 +1551,7 @@ dependencies = [
 
 [[package]]
 name = "harpia-eval"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "futures-util",
  "harpia-core",
@@ -1570,7 +1570,7 @@ dependencies = [
 
 [[package]]
 name = "harpia-http"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "bytes",
  "futures-core",
@@ -1591,8 +1591,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "harpia-learn"
+version = "0.3.0"
+dependencies = [
+ "harpia",
+ "serde_json",
+ "tempfile",
+ "tokio",
+]
+
+[[package]]
 name = "harpia-local"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "candle-core",
  "candle-nn",
@@ -1613,7 +1623,7 @@ dependencies = [
 
 [[package]]
 name = "harpia-pub"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "harpia-core",
  "regex",
@@ -1625,7 +1635,7 @@ dependencies = [
 
 [[package]]
 name = "harpia-structured"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "criterion",
  "harpia-core",
@@ -1640,7 +1650,7 @@ dependencies = [
 
 [[package]]
 name = "harpia-text"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "aho-corasick",
  "criterion",
@@ -1655,7 +1665,7 @@ dependencies = [
 
 [[package]]
 name = "harpia-train"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "candle-core",
  "candle-nn",
@@ -1675,7 +1685,7 @@ dependencies = [
 
 [[package]]
 name = "harpia-verify"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "harpia-core",
  "harpia-data",

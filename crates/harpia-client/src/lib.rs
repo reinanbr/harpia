@@ -26,6 +26,9 @@
 #[cfg(feature = "anthropic")]
 pub mod anthropic;
 mod batch;
+// The HTTP helpers are only used by the provider modules; without any provider feature they
+// are dead code, which is expected.
+#[cfg_attr(not(any(feature = "openai-compatible", feature = "anthropic", feature = "ollama")), allow(dead_code))]
 mod common;
 mod middleware;
 #[cfg(feature = "ollama")]

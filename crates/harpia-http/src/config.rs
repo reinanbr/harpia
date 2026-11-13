@@ -183,8 +183,8 @@ impl HttpConfig {
     /// The User-Agent header value.
     pub fn user_agent(&self) -> String {
         match &self.contact_email {
-            Some(e) => format!("{} (+https://github.com/harpia-rs/harpia; mailto:{e})", self.product),
-            None => format!("{} (+https://github.com/harpia-rs/harpia)", self.product),
+            Some(e) => format!("{} (+https://github.com/reinanbr/harpia; mailto:{e})", self.product),
+            None => format!("{} (+https://github.com/reinanbr/harpia)", self.product),
         }
     }
 }

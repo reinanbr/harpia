@@ -65,8 +65,7 @@ pub fn encode_doi(doi: &str) -> String {
         feature = "arxiv",
         feature = "europepmc",
         feature = "doaj",
-        feature = "wikipedia",
-        feature = "web"
+        feature = "wikipedia"
     )),
     allow(dead_code)
 )]
@@ -121,10 +120,7 @@ pub(crate) fn stamp(mut w: Work, source: &Source, f: &crate::fetch::Fetched) -> 
         feature = "openalex",
         feature = "semantic-scholar",
         feature = "arxiv",
-        feature = "europepmc",
-        feature = "doaj",
-        feature = "wikipedia",
-        feature = "web"
+        feature = "europepmc"
     )),
     allow(dead_code)
 )]

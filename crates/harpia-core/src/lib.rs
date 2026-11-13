@@ -1,6 +1,6 @@
 //! # harpia-core
 //!
-//! Shared vocabulary of the [Harpia](https://github.com/harpia-rs/harpia) toolkit:
+//! Shared vocabulary of the [Harpia](https://github.com/reinanbr/harpia) toolkit:
 //!
 //! - [`HarpiaError`] / [`Result`]: one error type for every crate, carrying context but never
 //!   secrets;

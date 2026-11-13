@@ -1,0 +1,44 @@
+[package]
+name = "harpia-learn"
+description = "Learning lessons for Harpia, written as tests: text, tokenization, models, model review and article review."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+# lessons only: never published to crates.io
+publish = false
+# lessons live in `lessons/`, declared below so they keep their numbered names
+autotests = false
+
+[dependencies]
+harpia = { path = "../crates/harpia", default-features = false, features = ["text", "data", "pub", "langid"] }
+
+[dev-dependencies]
+harpia = { workspace = true, features = ["text", "data", "structured", "pub", "langid", "tokenizers", "local", "train", "eval"] }
+serde_json = { workspace = true }
+tempfile = { workspace = true }
+tokio = { workspace = true }
+
+[[test]]
+name = "01_text"
+path = "lessons/01_text.rs"
+
+[[test]]
+name = "02_tokenization"
+path = "lessons/02_tokenization.rs"
+
+[[test]]
+name = "03_models"
+path = "lessons/03_models.rs"
+
+[[test]]
+name = "04_model_review"
+path = "lessons/04_model_review.rs"
+
+[[test]]
+name = "05_article_review"
+path = "lessons/05_article_review.rs"
+
+[lints]
+workspace = true

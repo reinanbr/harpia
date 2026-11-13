@@ -6,6 +6,24 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-11-13
+
+First release published to crates.io.
+
+### Added (lessons)
+
+- `tests/` (crate `harpia-learn`, not published): lessons written as tests, run by CI:
+  text (`01_text`), tokenization (`02_tokenization`), reading and running models
+  (`03_models`), grading and correcting models with LoRA (`04_model_review`) and reviewing a
+  LaTeX article (`05_article_review`) with a small errei-style reviewer (`tests/src/review.rs`)
+  over a pt-BR fixture paper. `HARPIA_ARTICLE_DIR` reviews any LaTeX project.
+
+### Fixed (release)
+
+- `cargo hack --each-feature` with `-D warnings`: `harpia-client` without provider features and
+  `harpia-verify` with only the `doaj`, `wikipedia` or `web` adapters no longer report dead code.
+- Repository, homepage and User-Agent URLs point to `github.com/reinanbr/harpia`.
+
 ### Added (milestone 7: serve)
 
 - `harpia serve --stdio`: newline-delimited JSON-RPC 2.0 (batches, notifications, streaming

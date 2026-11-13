@@ -55,8 +55,12 @@ before 1.0.
 
 ```toml
 [dependencies]
-harpia = { version = "0.1", features = ["full"] }
+harpia = { version = "0.3", features = ["full"] }
 ```
+
+New to Harpia? The lessons in [`tests/`](tests/README.md) walk through text, tokenization, models,
+model grading and correction, and article review, as runnable tests
+(`cargo test -p harpia-learn -- --nocapture`).
 
 ```rust,ignore
 use harpia::core::traits::ChatTemplate;
