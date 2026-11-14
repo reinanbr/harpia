@@ -170,7 +170,7 @@ fn read_file(path: &Path) -> Result<(Store, FileMeta)> {
     let json_len = u64_at(24) as usize;
     let mut raw = vec![0u8; rows * dim * 4];
     f.read_exact(&mut raw).map_err(io)?;
-    let data = raw.chunks_exact(4).map(|c| f32::from_le_bytes(c.try_into().expect("4 bytes"))).collect();
+    let data = raw.as_chunks::<4>().0.iter().map(|c| f32::from_le_bytes(*c)).collect();
     let mut json = vec![0u8; json_len];
     f.read_exact(&mut json).map_err(io)?;
     let meta: FileMeta = serde_json::from_slice(&json)?;

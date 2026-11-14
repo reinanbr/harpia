@@ -12,7 +12,7 @@ publish = false
 autotests = false
 
 [dependencies]
-harpia = { path = "../crates/harpia", default-features = false, features = ["text", "data", "pub", "langid"] }
+harpia = { path = "../crates/harpia", version = "0.3.0", default-features = false, features = ["text", "data", "pub", "langid"] }
 
 [dev-dependencies]
 harpia = { workspace = true, features = ["text", "data", "structured", "pub", "langid", "tokenizers", "local", "train", "eval"] }
